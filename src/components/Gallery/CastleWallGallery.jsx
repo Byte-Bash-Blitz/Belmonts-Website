@@ -19,6 +19,11 @@ const galleryImages = [
     title: 'Castle Fortress',
     description: 'The great stronghold where legends were forged'
   },
+
+
+
+
+  
   {
     id: 2,
     src: img2,

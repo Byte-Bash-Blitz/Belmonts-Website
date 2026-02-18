@@ -378,6 +378,10 @@ export default function Gallery() {
             onClick={() => setSelectedImage(null)}
             aria-label="Close"
           >
+
+
+
+            
             ✕
           </button>
           <div

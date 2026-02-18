@@ -17,6 +17,7 @@ import Treasure from './pages/Treasure';
 import { useSmoothScroll } from './hooks/useSmoothScroll';
 import './App.css';
 
+
 function HomePage() {
   useSmoothScroll();
 
