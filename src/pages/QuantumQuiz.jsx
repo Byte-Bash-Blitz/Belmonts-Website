@@ -316,12 +316,16 @@ export default function QuantumQuiz() {
   // Waiting Room state (seeded with stored lobby)
   const [teammates, setTeammates] = useState(getStoredLobby);
   const [lobbyNotice, setLobbyNotice] = useState('Waiting for session host to initiate quiz...');
-  const [copiedLink, setCopiedLink] = useState(false);
 
   // References to avoid stale closures in event listeners & timers
+  const userNameRef = useRef(userName);
   const userEmailRef = useRef(userEmail);
   const stageRef = useRef(stage);
   const isAdminRef = useRef(isAdmin);
+
+  useEffect(() => {
+    userNameRef.current = userName;
+  }, [userName]);
 
   useEffect(() => {
     userEmailRef.current = userEmail;
@@ -363,16 +367,6 @@ export default function QuantumQuiz() {
       // ignore
     }
   };
-
-  const handleCopyRoomLink = () => {
-    const link = `${window.location.origin}/quantum-quiz`;
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(link).then(() => {
-        setCopiedLink(true);
-        setTimeout(() => setCopiedLink(false), 2500);
-      }).catch(() => {});
-    }
-  };
   
   // Active Quiz State (10 seconds per question)
   const QUESTION_SECONDS = 10;
@@ -411,9 +405,34 @@ export default function QuantumQuiz() {
       try {
         const res = await fetch('/api/quiz/lobby');
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setTeammates(processLobbyList(data));
+          const serverLobby = await res.json();
+          if (Array.isArray(serverLobby)) {
+            const currentEmail = (userEmailRef.current || '').trim().toLowerCase();
+            let merged = [...serverLobby];
+            if (currentEmail) {
+              const hasSelf = merged.some(p => p.email && p.email.toLowerCase() === currentEmail);
+              if (!hasSelf && stageRef.current === 'WAITING_ROOM') {
+                const selfRecord = {
+                  id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                  name: userNameRef.current || 'Participant',
+                  email: userEmailRef.current,
+                  role: isAdminRef.current ? 'Session Host & Admin' : 'Participant',
+                  status: 'Ready',
+                  avatar: (userNameRef.current || 'P').charAt(0).toUpperCase(),
+                  isHost: isAdminRef.current,
+                };
+                merged.push(selfRecord);
+                fetch('/api/quiz/lobby', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(selfRecord)
+                }).catch(() => {});
+              }
+            }
+            try {
+              localStorage.setItem('HYNA_LOBBY_PARTICIPANTS', JSON.stringify(merged));
+            } catch {}
+            setTeammates(processLobbyList(merged));
           }
         }
       } catch {
@@ -568,7 +587,7 @@ export default function QuantumQuiz() {
   };
 
   // Name & Email Registration submit
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e?.preventDefault();
     const trimmedName = userName.trim();
     const trimmedEmail = userEmail.trim().toLowerCase();
@@ -598,6 +617,7 @@ export default function QuantumQuiz() {
 
     const adminCheck = trimmedEmail === ADMIN_EMAIL.toLowerCase();
     setIsAdmin(adminCheck);
+    userNameRef.current = trimmedName;
     isAdminRef.current = adminCheck;
     userEmailRef.current = trimmedEmail;
     stageRef.current = 'WAITING_ROOM';
@@ -607,41 +627,45 @@ export default function QuantumQuiz() {
       id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: trimmedName,
       email: trimmedEmail,
-      role: adminCheck ? 'Session Host & Admin (You)' : 'Participant (You)',
+      role: adminCheck ? 'Session Host & Admin' : 'Participant',
       status: 'Ready',
       avatar: userInitial,
-      isCurrentUser: true,
+      isCurrentUser: false,
       isHost: adminCheck,
     };
 
-    // Save actual user into persisted lobby
-    const currentStored = getStoredLobby();
-    const withoutSelf = currentStored.filter(p => p.email?.toLowerCase() !== trimmedEmail);
-    const updatedLobby = [...withoutSelf, { ...userObj, isCurrentUser: false, role: adminCheck ? 'Session Host & Admin' : 'Participant' }];
-
+    // 1. Post to backend server first
+    let currentLobby = [];
     try {
-      localStorage.setItem('HYNA_LOBBY_PARTICIPANTS', JSON.stringify(updatedLobby));
-    } catch {
-      // ignore
-    }
-
-    setTeammates(processLobbyList(updatedLobby, trimmedEmail));
-    setLobbyNotice(adminCheck ? 'You are host. Ready to launch when you are.' : 'Waiting for session host to initiate quiz...');
-
-    // Post to backend server so participants on other devices/phones show up in real-time
-    try {
-      fetch('/api/quiz/lobby', {
+      const res = await fetch('/api/quiz/lobby', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userObj)
-      }).then(res => res.json()).then(data => {
+      });
+      if (res.ok) {
+        const data = await res.json();
         if (data && Array.isArray(data.lobby)) {
-          setTeammates(processLobbyList(data.lobby, trimmedEmail));
+          currentLobby = data.lobby;
         }
-      }).catch(() => {});
+      }
+    } catch {
+      // offline fallback
+    }
+
+    if (!currentLobby.some(p => p.email && p.email.toLowerCase() === trimmedEmail)) {
+      const currentStored = getStoredLobby();
+      const withoutSelf = currentStored.filter(p => p.email?.toLowerCase() !== trimmedEmail);
+      currentLobby = [...withoutSelf, userObj];
+    }
+
+    try {
+      localStorage.setItem('HYNA_LOBBY_PARTICIPANTS', JSON.stringify(currentLobby));
     } catch {
       // ignore
     }
+
+    setTeammates(processLobbyList(currentLobby, trimmedEmail));
+    setLobbyNotice(adminCheck ? 'You are host. Ready to launch when you are.' : 'Waiting for session host to initiate quiz...');
 
     // Broadcast across tabs
     broadcastSync('LOBBY_UPDATE');
@@ -1401,23 +1425,6 @@ export default function QuantumQuiz() {
                     </p>
                   </>
                 )}
-              </div>
-
-              {/* Share Room Link Banner */}
-              <div className="room-share-bar">
-                <div className="room-share-info">
-                  <Share2 size={16} className="share-icon" />
-                  <span className="room-share-label">Join URL:</span>
-                  <code className="room-share-url">{typeof window !== 'undefined' ? `${window.location.origin}/quantum-quiz` : ''}</code>
-                </div>
-                <button
-                  type="button"
-                  className={`btn-copy-link ${copiedLink ? 'copied' : ''}`}
-                  onClick={handleCopyRoomLink}
-                >
-                  {copiedLink ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copiedLink ? 'Copied URL!' : 'Copy Join Link'}</span>
-                </button>
               </div>
 
               {/* Lobby Status Banner */}

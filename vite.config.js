@@ -33,6 +33,7 @@ function quizSyncPlugin() {
   let state = loadData();
 
   const middleware = (req, res, next) => {
+    state = loadData();
     const url = req.url?.split('?')[0];
 
     // Enable CORS for API requests
