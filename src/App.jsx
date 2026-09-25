@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import Hero from './components/Hero/Hero';
+import EventSection, { QUIZ_URL } from './components/EventSection/EventSection';
 import About from './components/About/About';
 import Members from './components/Members/Members';
 import Gallery from './components/Gallery/Gallery';
@@ -14,6 +15,7 @@ import MobileMenu from './components/MobileMenu/MobileMenu';
 import MemberDetail from './pages/MemberDetail';
 import Legends from './pages/Legends';
 import Treasure from './pages/Treasure';
+import QuantumQuiz from './pages/QuantumQuiz';
 import { useSmoothScroll } from './hooks/useSmoothScroll';
 import './App.css';
 
@@ -25,6 +27,7 @@ function HomePage() {
     <div className="app">
       <MobileMenu />
       <Hero />
+      <EventSection />
       <About />
       <Members />
       <Gallery />
@@ -146,6 +149,7 @@ function App() {
         <Route path="/member/leader/:leaderId" element={<MemberDetail />} />
         <Route path="/legends" element={<Legends />} />
         <Route path="/treasure" element={<Treasure />} />
+        <Route path={QUIZ_URL} element={<QuantumQuiz />} />
       </Routes>
     </Router>
   );
