@@ -123,29 +123,30 @@ export default function EventSection({ quizUrl = QUIZ_URL }) {
       desc: 'Speed countdown timer',
     },
     {
-      id: 'attempt',
-      icon: ShieldAlert,
-      value: '1',
-      label: 'Attempt',
-      desc: 'Single submission',
-    },
-    {
       id: 'scoring',
       icon: Sparkles,
+      value: '+5 / -2',
+      label: 'Points Marking',
+      desc: '+5 Correct, -2 Wrong',
+    },
+    {
+      id: 'leaderboard',
+      icon: ShieldAlert,
       value: 'Live',
       label: 'Leaderboard',
-      desc: 'Host revealed rankings',
+      desc: 'Host revealed podium',
     },
   ];
 
   const rulesList = [
     '20 questions in total',
     '10 seconds per question (auto-advances on timeout)',
+    'Scoring: +5 points for each correct answer',
+    'Negative Marking: -2 points deducted for each wrong answer',
     'Select one answer for each question',
     "Questions are based on today's Quantum Computing session",
     'You get only one attempt',
     'Live leaderboard revealed by the host after the quiz',
-    'Speed and accuracy determine your rank',
   ];
 
   return (

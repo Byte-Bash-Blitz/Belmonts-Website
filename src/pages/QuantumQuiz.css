@@ -3138,6 +3138,153 @@
   font-style: italic;
 }
 
+/* Scoring Rule Badges & Point Display */
+.scoring-pill-rule {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(0, 194, 255, 0.15);
+  border: 1px solid rgba(0, 194, 255, 0.4);
+  color: #00C2FF;
+  letter-spacing: 0.02em;
+}
+
+.results-review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.review-scoring-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.score-pill-pts {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.3rem 0.75rem;
+  background: rgba(0, 194, 255, 0.15);
+  border: 1px solid rgba(0, 194, 255, 0.4);
+  color: #00C2FF;
+  border-radius: 6px;
+}
+
+.score-pill-correct {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.3rem 0.65rem;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ADE80;
+  border-radius: 6px;
+}
+
+.score-pill-wrong {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.3rem 0.65rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #F87171;
+  border-radius: 6px;
+}
+
+.score-pill-unanswered {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.3rem 0.65rem;
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #CBD5E1;
+  border-radius: 6px;
+}
+
+.points-earned-tag {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.points-earned-tag.tag-plus {
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid #22C55E;
+  color: #4ADE80;
+}
+
+.points-earned-tag.tag-minus {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid #EF4444;
+  color: #F87171;
+}
+
+.points-earned-tag.tag-zero {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94A3B8;
+}
+
+.lb-points-display {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.lb-points-num {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #FFFFFF;
+}
+
+.lb-points-unit {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #00C2FF;
+  text-transform: uppercase;
+}
+
+.lb-score-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.chip-correct {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #4ADE80;
+  background: rgba(34, 197, 94, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.chip-wrong {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #F87171;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.inspect-q-tag.tag-unanswered {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #CBD5E1;
+}
+
 @media (max-width: 768px) {
   .leaderboard-podium-grid {
     grid-template-columns: 1fr;
