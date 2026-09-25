@@ -2,9 +2,38 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import { createClient } from '@supabase/supabase-js'
 
 function quizSyncPlugin() {
   const dataFilePath = path.resolve(process.cwd(), '.quiz-session-store.json');
+  const envFilePath = path.resolve(process.cwd(), '.env');
+
+  const getEnvConfig = () => {
+    let url = process.env.VITE_SUPABASE_URL || '';
+    let anonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    let secretKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    if (fs.existsSync(envFilePath)) {
+      const content = fs.readFileSync(envFilePath, 'utf-8');
+      const uMatch = content.match(/VITE_SUPABASE_URL\s*=\s*(.*)/);
+      const aMatch = content.match(/VITE_SUPABASE_ANON_KEY\s*=\s*(.*)/);
+      const sMatch = content.match(/SUPABASE_SERVICE_ROLE_KEY\s*=\s*(.*)/);
+      if (uMatch) url = uMatch[1].trim();
+      if (aMatch) anonKey = aMatch[1].trim();
+      if (sMatch) secretKey = sMatch[1].trim();
+    }
+    return { url, anonKey, secretKey };
+  };
+
+  const getSupabaseAdmin = () => {
+    const { url, secretKey, anonKey } = getEnvConfig();
+    const keyToUse = secretKey || anonKey;
+    if (url && keyToUse && url.startsWith('http')) {
+      try {
+        return createClient(url, keyToUse);
+      } catch {}
+    }
+    return null;
+  };
 
   const loadData = () => {
     try {
@@ -47,21 +76,15 @@ function quizSyncPlugin() {
       return;
     }
 
-    // 0. Cloud Config API (allows any phone/laptop connecting to dev server to sync with Supabase)
+    // 0. Cloud Config API
     if (url === '/api/quiz/config') {
       if (req.method === 'GET') {
-        const envPath = path.resolve(process.cwd(), '.env');
-        let envUrl = process.env.VITE_SUPABASE_URL || state.supabaseUrl || '';
-        let envKey = process.env.VITE_SUPABASE_ANON_KEY || state.supabaseAnonKey || '';
-        if ((!envUrl || !envKey) && fs.existsSync(envPath)) {
-          const content = fs.readFileSync(envPath, 'utf-8');
-          const urlMatch = content.match(/VITE_SUPABASE_URL\s*=\s*(.*)/);
-          const keyMatch = content.match(/VITE_SUPABASE_ANON_KEY\s*=\s*(.*)/);
-          if (urlMatch) envUrl = urlMatch[1].trim();
-          if (keyMatch) envKey = keyMatch[1].trim();
-        }
+        const envConfig = getEnvConfig();
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ supabaseUrl: envUrl, supabaseAnonKey: envKey }));
+        res.end(JSON.stringify({ 
+          supabaseUrl: envConfig.url || state.supabaseUrl || '', 
+          supabaseAnonKey: envConfig.anonKey || state.supabaseAnonKey || '' 
+        }));
         return;
       }
       if (req.method === 'POST') {
@@ -108,6 +131,20 @@ function quizSyncPlugin() {
               );
               state.lobby = [...currentLobby, { ...user, lastSeen: Date.now() }];
               saveData(state);
+
+              // Auto-sync to Supabase via admin client
+              const sb = getSupabaseAdmin();
+              if (sb) {
+                sb.from('quiz_participants').upsert({
+                  id: user.id || `user_${Date.now()}`,
+                  name: user.name,
+                  email: user.email,
+                  role: user.role,
+                  status: user.status || 'Ready',
+                  avatar: user.avatar,
+                  is_host: Boolean(user.isHost || user.is_host)
+                }, { onConflict: 'email' }).then(() => {}).catch(() => {});
+              }
             }
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ success: true, lobby: state.lobby }));
@@ -121,13 +158,17 @@ function quizSyncPlugin() {
       if (req.method === 'DELETE') {
         state.lobby = [];
         saveData(state);
+        const sb = getSupabaseAdmin();
+        if (sb) {
+          sb.from('quiz_participants').delete().neq('email', 'vigneshvelappan73051@gmail.com').then(() => {}).catch(() => {});
+        }
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ success: true, lobby: [] }));
         return;
       }
     }
 
-    // 2. Quiz status API (started, showLeaderboard, activeQuestion)
+    // 2. Quiz status API
     if (url === '/api/quiz/status') {
       if (req.method === 'GET') {
         res.setHeader('Content-Type', 'application/json');
@@ -142,6 +183,17 @@ function quizSyncPlugin() {
             const newStatus = JSON.parse(body);
             state.status = { ...(state.status || {}), ...newStatus, updatedAt: Date.now() };
             saveData(state);
+
+            const sb = getSupabaseAdmin();
+            if (sb) {
+              sb.from('quiz_session_state').upsert({
+                session_id: 'current_session',
+                started: Boolean(state.status.started),
+                show_leaderboard: Boolean(state.status.showLeaderboard),
+                active_question: state.status.activeQuestion || 0
+              }, { onConflict: 'session_id' }).then(() => {}).catch(() => {});
+            }
+
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ success: true, status: state.status }));
           } catch {
@@ -175,6 +227,25 @@ function quizSyncPlugin() {
                 return (a.timeTaken || 0) - (b.timeTaken || 0);
               });
               saveData(state);
+
+              const sb = getSupabaseAdmin();
+              if (sb) {
+                sb.from('quiz_submissions').upsert({
+                  id: entry.id || `sub_${Date.now()}`,
+                  name: entry.name,
+                  email: entry.email,
+                  score: entry.score,
+                  max_points: entry.maxPoints,
+                  correct_count: entry.correctCount,
+                  wrong_count: entry.wrongCount,
+                  unattempted_count: entry.unattemptedCount,
+                  total_questions: entry.totalQuestions,
+                  accuracy: entry.percentage,
+                  time_taken: entry.timeTaken,
+                  answers: entry.answers,
+                  completed_at: new Date().toISOString()
+                }, { onConflict: 'email' }).then(() => {}).catch(() => {});
+              }
             }
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ success: true, leaderboard: state.leaderboard }));
@@ -188,6 +259,10 @@ function quizSyncPlugin() {
       if (req.method === 'DELETE') {
         state.leaderboard = [];
         saveData(state);
+        const sb = getSupabaseAdmin();
+        if (sb) {
+          sb.from('quiz_submissions').delete().neq('id', 'preserve_none').then(() => {}).catch(() => {});
+        }
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ success: true, leaderboard: [] }));
         return;
