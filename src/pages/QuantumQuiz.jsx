@@ -1061,7 +1061,7 @@ export default function QuantumQuiz() {
                       id="participant-name"
                       type="text"
                       className={`hyna-input ${nameError ? 'input-error' : ''}`}
-                      placeholder="e.g., Vignesh Velappan"
+                      placeholder="Name"
                       value={userName}
                       onChange={(e) => {
                         setUserName(e.target.value);
@@ -1096,7 +1096,7 @@ export default function QuantumQuiz() {
                       id="participant-email"
                       type="email"
                       className={`hyna-input ${emailError ? 'input-error' : ''}`}
-                      placeholder="e.g., vigneshvelappan73051@gmail.com"
+                      placeholder="gmail"
                       value={userEmail}
                       onChange={(e) => {
                         setUserEmail(e.target.value);
