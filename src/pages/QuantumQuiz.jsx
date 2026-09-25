@@ -734,7 +734,7 @@ export default function QuantumQuiz() {
             aria-label="Back to Homepage"
           >
             <ArrowLeft size={18} />
-            <span>Back to Hyna Studio</span>
+            <span>Back to Home</span>
           </button>
 
           <div className="quiz-event-meta">
