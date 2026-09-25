@@ -383,9 +383,9 @@ export default function QuantumQuiz() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [userEmail]);
 
-  // Active quiz 10-second per question timer
+  // Active quiz 10-second per question timer (ONLY FOR ATTENDEES, NOT ADMIN)
   useEffect(() => {
-    if (stage !== 'QUIZ_ACTIVE') return;
+    if (stage !== 'QUIZ_ACTIVE' || isAdmin) return;
 
     const timer = setInterval(() => {
       setTotalTimeSpent(prev => prev + 1);
@@ -411,7 +411,7 @@ export default function QuantumQuiz() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [stage, questions.length]);
+  }, [stage, questions.length, isAdmin]);
 
   // Check if entered email matches admin
   const isInputAdmin = (emailStr) => {
