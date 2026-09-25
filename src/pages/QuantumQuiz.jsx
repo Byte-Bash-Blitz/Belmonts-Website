@@ -30,7 +30,8 @@ import {
   Flame,
   Medal,
   Timer,
-  BarChart3
+  BarChart3,
+  ChevronRight
 } from 'lucide-react';
 import './QuantumQuiz.css';
 
@@ -565,23 +566,60 @@ export default function QuantumQuiz() {
     }));
   };
 
+  const handleHostRevealLeaderboard = () => {
+    setShowLeaderboard(true);
+    try {
+      localStorage.setItem('HYNA_LEADERBOARD_PUBLISHED', 'true');
+    } catch {
+      // ignore
+    }
+    setStage('QUIZ_RESULTS');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
+      const nextQ = currentQuestion + 1;
+      setCurrentQuestion(nextQ);
       setQuestionTimeLeft(QUESTION_SECONDS);
+      if (isAdmin) {
+        try {
+          localStorage.setItem('HYNA_HOST_ACTIVE_QUESTION', String(nextQ));
+        } catch {
+          // ignore
+        }
+      }
     } else {
-      finalizeQuiz(selectedAnswers);
+      if (isAdmin) {
+        handleHostRevealLeaderboard();
+      } else {
+        finalizeQuiz(selectedAnswers);
+      }
     }
   };
 
   const handlePrev = () => {
     if (currentQuestion > 0) {
-      setCurrentQuestion(prev => prev - 1);
+      const prevQ = currentQuestion - 1;
+      setCurrentQuestion(prevQ);
       setQuestionTimeLeft(QUESTION_SECONDS);
+      if (isAdmin) {
+        try {
+          localStorage.setItem('HYNA_HOST_ACTIVE_QUESTION', String(prevQ));
+        } catch {
+          // ignore
+        }
+      }
     }
   };
 
   const finalizeQuiz = (finalAnswers = selectedAnswers) => {
+    // If admin is browsing or ends quiz, admin does NOT get saved as competitor
+    if (isAdmin) {
+      handleHostRevealLeaderboard();
+      return;
+    }
+
     let finalScore = 0;
     questions.forEach((q, idx) => {
       if (finalAnswers[idx] === q.correct) {
@@ -599,7 +637,7 @@ export default function QuantumQuiz() {
       timeTaken: totalTimeSpent,
       completedAt: Date.now(),
       answers: finalAnswers,
-      isHost: isAdmin
+      isHost: false
     };
 
     const currentLb = getStoredLeaderboard();
@@ -621,7 +659,11 @@ export default function QuantumQuiz() {
   };
 
   const handleSubmitQuiz = () => {
-    finalizeQuiz(selectedAnswers);
+    if (isAdmin) {
+      handleHostRevealLeaderboard();
+    } else {
+      finalizeQuiz(selectedAnswers);
+    }
   };
 
   const toggleLeaderboardPublish = () => {
@@ -1276,122 +1318,292 @@ export default function QuantumQuiz() {
              =============================================================== */}
           {stage === 'QUIZ_ACTIVE' && (
             <div className="quiz-active-card">
-              {/* Progress & Speed Timer Bar */}
-              <div className="quiz-progress-section">
-                <div className="quiz-progress-text">
-                  <div className="progress-left-info">
-                    <span className="user-badge-pill">
-                      {isAdmin ? '👑 Host: ' : '👤 '}
-                      {userName}
-                    </span>
-                    <span>Question {currentQuestion + 1} of {questions.length}</span>
-                  </div>
-                  <span>{answeredCount} / {questions.length} Answered</span>
-                </div>
-                <div className="quiz-progress-track">
-                  <div
-                    className="quiz-progress-fill"
-                    style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* 10-Second Countdown Visual Bar */}
-              <div className="speed-timer-bar-wrap">
-                <div className="speed-timer-header">
-                  <div className="speed-timer-indicator">
-                    <Timer size={18} className={questionTimeLeft <= 3 ? 'timer-icon-alert' : 'timer-icon-active'} />
-                    <span className={`speed-timer-digits ${questionTimeLeft <= 3 ? 'danger' : questionTimeLeft <= 5 ? 'warn' : 'normal'}`}>
-                      {questionTimeLeft}s
-                    </span>
-                    <span className="speed-timer-label">remaining for this question</span>
-                  </div>
-                  <span className="speed-timer-subline">⚡ Auto-advances when time expires</span>
-                </div>
-                <div className="speed-timer-track">
-                  <div
-                    className={`speed-timer-fill ${questionTimeLeft <= 3 ? 'danger' : questionTimeLeft <= 5 ? 'warn' : 'normal'}`}
-                    style={{ width: `${(questionTimeLeft / 10) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Question Text */}
-              {questions[currentQuestion] && (
-                <>
-                  <div className="quiz-question-box">
-                    <span className="question-number-pill">Q{currentQuestion + 1}</span>
-                    <h2 className="question-title">
-                      {questions[currentQuestion].question}
-                    </h2>
+              {isAdmin ? (
+                /* =========================================================
+                   ADMIN / HOST PRESENTER VIEW (NOT PLAYING)
+                   - Admin does NOT play or select answers
+                   - Admin only navigates "Next" / "Prev" through questions
+                   - Highlights the correct answer in green & shows explanation
+                   - On the last question: displays "🏆 Reveal Leaderboard"
+                   ========================================================= */
+                <div className="host-presenter-console">
+                  {/* Host Header Banner */}
+                  <div className="host-presenter-banner">
+                    <div className="host-banner-left">
+                      <div className="host-badge-pill">
+                        <Crown size={18} className="crown-icon-gold" />
+                        <span>Host Presenter Screen</span>
+                      </div>
+                      <h2 className="host-banner-title">
+                        Quantum Computing Challenge • Question {currentQuestion + 1} of {questions.length}
+                      </h2>
+                      <p className="host-banner-subtitle">
+                        You are presenting to attendees. You do not play or score. Click <strong>Next</strong> to progress. On Question {questions.length}, click <strong>Reveal Leaderboard</strong>.
+                      </p>
+                    </div>
+                    <div className="host-banner-badge-box">
+                      <span className="host-mode-tag">👑 Presenter Mode</span>
+                      <span className="host-not-playing-pill">Not Playing / No Timer</span>
+                      <button
+                        type="button"
+                        className="host-quick-reveal-btn"
+                        onClick={handleHostRevealLeaderboard}
+                        title="Skip ahead and reveal leaderboard immediately"
+                      >
+                        <Trophy size={14} />
+                        <span>Reveal Leaderboard Now</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Options */}
-                  <div className="quiz-options-grid">
-                    {questions[currentQuestion].options.map((opt, idx) => {
-                      const isSelected = selectedAnswers[currentQuestion] === idx;
-                      return (
+                  {/* Presenter Progress Bar */}
+                  <div className="quiz-progress-section host-progress-section">
+                    <div className="quiz-progress-text">
+                      <div className="progress-left-info">
+                        <span className="user-badge-pill host-pill-active">
+                          👑 Host: {userName}
+                        </span>
+                        <span>Question {currentQuestion + 1} of {questions.length}</span>
+                      </div>
+                      <span className="host-status-counter">
+                        {currentQuestion === questions.length - 1
+                          ? '⚡ Final Question'
+                          : `${questions.length - (currentQuestion + 1)} questions remaining`}
+                      </span>
+                    </div>
+                    <div className="quiz-progress-track">
+                      <div
+                        className="quiz-progress-fill host-progress-fill"
+                        style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Question Display */}
+                  {questions[currentQuestion] && (
+                    <div className="host-question-display">
+                      <div className="quiz-question-box host-question-box">
+                        <span className="question-number-pill host-q-pill">Q{currentQuestion + 1}</span>
+                        <h2 className="question-title">
+                          {questions[currentQuestion].question}
+                        </h2>
+                      </div>
+
+                      {/* Options with Correct Answer Highlighted */}
+                      <div className="host-options-container">
+                        <div className="host-options-legend">
+                          <span className="legend-label">Presenter Master Key:</span>
+                          <span className="legend-badge">
+                            <CheckCircle2 size={14} /> Correct answer is marked in green
+                          </span>
+                        </div>
+
+                        <div className="quiz-options-grid host-options-grid">
+                          {questions[currentQuestion].options.map((opt, idx) => {
+                            const isCorrect = questions[currentQuestion].correct === idx;
+                            return (
+                              <div
+                                key={idx}
+                                className={`quiz-option-btn host-option-card ${isCorrect ? 'is-correct-card' : 'is-neutral-card'}`}
+                              >
+                                <span className={`option-letter ${isCorrect ? 'letter-correct' : ''}`}>
+                                  {String.fromCharCode(65 + idx)}
+                                </span>
+                                <span className="option-text">{opt}</span>
+                                {isCorrect && (
+                                  <span className="host-correct-badge">
+                                    <CheckCircle2 size={16} />
+                                    <span>Correct Answer</span>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Explanation for Host to read */}
+                        {questions[currentQuestion].explanation && (
+                          <div className="host-explanation-box">
+                            <div className="host-explanation-header">
+                              <Sparkles size={16} className="sparkle-icon" />
+                              <span>Host Explanation Note</span>
+                            </div>
+                            <p className="host-explanation-text">
+                              {questions[currentQuestion].explanation}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Host Navigation Footer */}
+                  <div className="quiz-nav-footer host-nav-footer">
+                    <button
+                      type="button"
+                      className="quiz-nav-btn prev"
+                      onClick={handlePrev}
+                      disabled={currentQuestion === 0}
+                    >
+                      Previous
+                    </button>
+
+                    <div className="quiz-question-dots host-dots">
+                      {questions.map((_, i) => (
                         <button
-                          key={idx}
+                          key={i}
                           type="button"
-                          className={`quiz-option-btn ${isSelected ? 'selected' : ''}`}
-                          onClick={() => handleSelectOption(idx)}
+                          className={`dot-pill ${i === currentQuestion ? 'active' : ''}`}
+                          onClick={() => setCurrentQuestion(i)}
+                          aria-label={`Jump to question ${i + 1}`}
+                          title={`Jump to Question ${i + 1}`}
                         >
-                          <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
-                          <span className="option-text">{opt}</span>
+                          {i + 1}
                         </button>
-                      );
-                    })}
+                      ))}
+                    </div>
+
+                    {currentQuestion < questions.length - 1 ? (
+                      <button
+                        type="button"
+                        className="quiz-nav-btn next host-next-btn"
+                        onClick={handleNext}
+                      >
+                        <span>Next Question</span>
+                        <ChevronRight size={18} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="quiz-nav-btn submit host-reveal-btn"
+                        onClick={handleHostRevealLeaderboard}
+                      >
+                        <Trophy size={20} className="trophy-bounce" />
+                        <span>🏆 Reveal Leaderboard to Everyone</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* =========================================================
+                   PARTICIPANT / ATTENDEE PLAYING VIEW (10s TIMER PER QUESTION)
+                   ========================================================= */
+                <>
+                  {/* Progress & Speed Timer Bar */}
+                  <div className="quiz-progress-section">
+                    <div className="quiz-progress-text">
+                      <div className="progress-left-info">
+                        <span className="user-badge-pill">👤 {userName}</span>
+                        <span>Question {currentQuestion + 1} of {questions.length}</span>
+                      </div>
+                      <span>{answeredCount} / {questions.length} Answered</span>
+                    </div>
+                    <div className="quiz-progress-track">
+                      <div
+                        className="quiz-progress-fill"
+                        style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 10-Second Countdown Visual Bar */}
+                  <div className="speed-timer-bar-wrap">
+                    <div className="speed-timer-header">
+                      <div className="speed-timer-indicator">
+                        <Timer size={18} className={questionTimeLeft <= 3 ? 'timer-icon-alert' : 'timer-icon-active'} />
+                        <span className={`speed-timer-digits ${questionTimeLeft <= 3 ? 'danger' : questionTimeLeft <= 5 ? 'warn' : 'normal'}`}>
+                          {questionTimeLeft}s
+                        </span>
+                        <span className="speed-timer-label">remaining for this question</span>
+                      </div>
+                      <span className="speed-timer-subline">⚡ Auto-advances when time expires</span>
+                    </div>
+                    <div className="speed-timer-track">
+                      <div
+                        className={`speed-timer-fill ${questionTimeLeft <= 3 ? 'danger' : questionTimeLeft <= 5 ? 'warn' : 'normal'}`}
+                        style={{ width: `${(questionTimeLeft / 10) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Question Text */}
+                  {questions[currentQuestion] && (
+                    <>
+                      <div className="quiz-question-box">
+                        <span className="question-number-pill">Q{currentQuestion + 1}</span>
+                        <h2 className="question-title">
+                          {questions[currentQuestion].question}
+                        </h2>
+                      </div>
+
+                      {/* Options */}
+                      <div className="quiz-options-grid">
+                        {questions[currentQuestion].options.map((opt, idx) => {
+                          const isSelected = selectedAnswers[currentQuestion] === idx;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              className={`quiz-option-btn ${isSelected ? 'selected' : ''}`}
+                              onClick={() => handleSelectOption(idx)}
+                            >
+                              <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
+                              <span className="option-text">{opt}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Footer Navigation */}
+                  <div className="quiz-nav-footer">
+                    <button
+                      type="button"
+                      className="quiz-nav-btn prev"
+                      onClick={handlePrev}
+                      disabled={currentQuestion === 0}
+                    >
+                      Previous
+                    </button>
+
+                    <div className="quiz-question-dots">
+                      {questions.map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`dot-pill ${i === currentQuestion ? 'active' : ''} ${selectedAnswers[i] !== undefined ? 'answered' : ''}`}
+                          onClick={() => {
+                            setCurrentQuestion(i);
+                            setQuestionTimeLeft(QUESTION_SECONDS);
+                          }}
+                          aria-label={`Jump to question ${i + 1}`}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                    </div>
+
+                    {currentQuestion < questions.length - 1 ? (
+                      <button
+                        type="button"
+                        className="quiz-nav-btn next"
+                        onClick={handleNext}
+                      >
+                        Next Question
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="quiz-nav-btn submit"
+                        onClick={handleSubmitQuiz}
+                      >
+                        Submit Quiz
+                      </button>
+                    )}
                   </div>
                 </>
               )}
-
-              {/* Footer Navigation */}
-              <div className="quiz-nav-footer">
-                <button
-                  type="button"
-                  className="quiz-nav-btn prev"
-                  onClick={handlePrev}
-                  disabled={currentQuestion === 0}
-                >
-                  Previous
-                </button>
-
-                <div className="quiz-question-dots">
-                  {questions.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`dot-pill ${i === currentQuestion ? 'active' : ''} ${selectedAnswers[i] !== undefined ? 'answered' : ''}`}
-                      onClick={() => {
-                        setCurrentQuestion(i);
-                        setQuestionTimeLeft(QUESTION_SECONDS);
-                      }}
-                      aria-label={`Jump to question ${i + 1}`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                </div>
-
-                {currentQuestion < questions.length - 1 ? (
-                  <button
-                    type="button"
-                    className="quiz-nav-btn next"
-                    onClick={handleNext}
-                  >
-                    Next Question
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="quiz-nav-btn submit"
-                    onClick={handleSubmitQuiz}
-                  >
-                    Submit Quiz
-                  </button>
-                )}
-              </div>
             </div>
           )}
 
@@ -1598,39 +1810,71 @@ export default function QuantumQuiz() {
                     </div>
                   </div>
 
-                  {/* Review My Own Answers Section */}
-                  <div className="results-review-list">
-                    <h3 className="review-title">My Answers Breakdown ({score}/{questions.length})</h3>
-                    {questions.map((q, idx) => {
-                      const userAnswer = selectedAnswers[idx];
-                      const isCorrect = userAnswer === q.correct;
-                      return (
-                        <div key={q.id || idx} className={`review-item ${isCorrect ? 'correct' : 'incorrect'}`}>
-                          <div className="review-item-header">
-                            <span className="review-icon">
-                              {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                            </span>
-                            <span className="review-question-text">Q{idx + 1}: {q.question}</span>
+                  {/* Review Section: Personal for Attendee, Master Key for Host */}
+                  {!isAdmin ? (
+                    <div className="results-review-list">
+                      <h3 className="review-title">My Answers Breakdown ({score}/{questions.length})</h3>
+                      {questions.map((q, idx) => {
+                        const userAnswer = selectedAnswers[idx];
+                        const isCorrect = userAnswer === q.correct;
+                        return (
+                          <div key={q.id || idx} className={`review-item ${isCorrect ? 'correct' : 'incorrect'}`}>
+                            <div className="review-item-header">
+                              <span className="review-icon">
+                                {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                              </span>
+                              <span className="review-question-text">Q{idx + 1}: {q.question}</span>
+                            </div>
+                            <div className="review-answer-details">
+                              <div className="answer-row">
+                                <span className="ans-label">Your Answer:</span>
+                                <span className={`ans-val ${isCorrect ? 'good' : 'bad'}`}>
+                                  {userAnswer !== undefined ? q.options[userAnswer] : 'Time expired (No answer selected)'}
+                                </span>
+                              </div>
+                              {!isCorrect && (
+                                <div className="answer-row">
+                                  <span className="ans-label">Correct Answer:</span>
+                                  <span className="ans-val good">{q.options[q.correct]}</span>
+                                </div>
+                              )}
+                              <p className="explanation-text">{q.explanation}</p>
+                            </div>
                           </div>
-                          <div className="review-answer-details">
-                            <div className="answer-row">
-                              <span className="ans-label">Your Answer:</span>
-                              <span className={`ans-val ${isCorrect ? 'good' : 'bad'}`}>
-                                {userAnswer !== undefined ? q.options[userAnswer] : 'Time expired (No answer selected)'}
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* For Host / Admin: Official Master Answer Key for all questions */
+                    <div className="admin-master-key-section">
+                      <div className="admin-master-key-header">
+                        <div className="key-header-left">
+                          <Crown size={20} className="crown-icon-gold" />
+                          <h3 className="review-title">Official Master Key ({questions.length} Questions)</h3>
+                        </div>
+                        <span className="key-subline">Host Verification & Reference</span>
+                      </div>
+                      <div className="admin-key-grid">
+                        {questions.map((q, idx) => (
+                          <div key={q.id || idx} className="master-key-item">
+                            <div className="master-key-item-header">
+                              <span className="master-key-q-num">Q{idx + 1}</span>
+                              <span className="master-key-q-title">{q.question}</span>
+                            </div>
+                            <div className="master-key-answer-box">
+                              <span className="master-key-badge">✓ Correct:</span>
+                              <span className="master-key-answer-text">
+                                [{String.fromCharCode(65 + q.correct)}] {q.options[q.correct]}
                               </span>
                             </div>
-                            {!isCorrect && (
-                              <div className="answer-row">
-                                <span className="ans-label">Correct Answer:</span>
-                                <span className="ans-val good">{q.options[q.correct]}</span>
-                              </div>
+                            {q.explanation && (
+                              <p className="master-key-explanation">{q.explanation}</p>
                             )}
-                            <p className="explanation-text">{q.explanation}</p>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Attendee Waiting Screen (Leaderboard Hidden by Host) */
