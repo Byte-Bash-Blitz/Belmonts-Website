@@ -111,16 +111,16 @@ export default function EventSection({ quizUrl = QUIZ_URL }) {
     {
       id: 'questions',
       icon: FileQuestion,
-      value: '10',
+      value: '20',
       label: 'Questions',
-      desc: 'Carefully curated',
+      desc: 'Rapid-fire assessment',
     },
     {
       id: 'time',
       icon: Clock,
-      value: '10',
-      label: 'Minutes',
-      desc: 'Session window',
+      value: '10s',
+      label: 'Per Question',
+      desc: 'Speed countdown timer',
     },
     {
       id: 'attempt',
@@ -132,20 +132,20 @@ export default function EventSection({ quizUrl = QUIZ_URL }) {
     {
       id: 'scoring',
       icon: Sparkles,
-      value: 'Auto',
-      label: 'Automatic Scoring',
-      desc: 'Instant results',
+      value: 'Live',
+      label: 'Leaderboard',
+      desc: 'Host revealed rankings',
     },
   ];
 
   const rulesList = [
-    '10 questions in total',
-    'You have 10 minutes to complete the quiz',
+    '20 questions in total',
+    '10 seconds per question (auto-advances on timeout)',
     'Select one answer for each question',
     "Questions are based on today's Quantum Computing session",
     'You get only one attempt',
-    'Submit your answers before the quiz closes',
-    'Your score will be calculated automatically',
+    'Live leaderboard revealed by the host after the quiz',
+    'Speed and accuracy determine your rank',
   ];
 
   return (
@@ -184,7 +184,7 @@ export default function EventSection({ quizUrl = QUIZ_URL }) {
           <h2 className="hyna-event-heading" ref={headingRef}>
             <span className="heading-topic">Quantum Computing</span>
             <span className="heading-separator" aria-hidden="true"> — </span>
-            <span className="heading-highlight">10 Minute Quiz</span>
+            <span className="heading-highlight">20 Question Challenge</span>
           </h2>
           <p className="hyna-event-subtitle" ref={subtitleRef}>
             Test your understanding of today&apos;s Quantum Computing session.
