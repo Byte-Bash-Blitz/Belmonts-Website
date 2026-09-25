@@ -313,12 +313,70 @@ export default function QuantumQuiz() {
   const [newExplanation, setNewExplanation] = useState('');
   const [adminFeedback, setAdminFeedback] = useState('');
 
-  // Waiting Room state (only real joined participants)
-  const [teammates, setTeammates] = useState([]);
+  // Waiting Room state (seeded with stored lobby)
+  const [teammates, setTeammates] = useState(getStoredLobby);
   const [lobbyNotice, setLobbyNotice] = useState('Waiting for session host to initiate quiz...');
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // References to avoid stale closures in event listeners & timers
+  const userEmailRef = useRef(userEmail);
+  const stageRef = useRef(stage);
+  const isAdminRef = useRef(isAdmin);
+
+  useEffect(() => {
+    userEmailRef.current = userEmail;
+  }, [userEmail]);
+
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
+
+  useEffect(() => {
+    isAdminRef.current = isAdmin;
+  }, [isAdmin]);
+
+  // Helper to process raw participants with correct user perspective
+  const processLobbyList = (rawLobby, emailOverride = null) => {
+    if (!Array.isArray(rawLobby)) return [];
+    const currentEmail = (emailOverride ?? userEmailRef.current ?? '').trim().toLowerCase();
+    return rawLobby.map(p => {
+      const isMe = Boolean(p.email && currentEmail && p.email.toLowerCase() === currentEmail);
+      return {
+        ...p,
+        isCurrentUser: isMe,
+        role: isMe
+          ? (p.isHost ? 'Session Host & Admin (You)' : 'Participant (You)')
+          : (p.isHost ? 'Session Host & Admin' : 'Participant')
+      };
+    });
+  };
+
+  // BroadcastChannel for instant zero-latency cross-tab sync
+  const broadcastSync = (type, payload = null) => {
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('HYNA_QUIZ_REALTIME_CHANNEL');
+        bc.postMessage({ type, payload, timestamp: Date.now() });
+        bc.close();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCopyRoomLink = () => {
+    const link = `${window.location.origin}/quantum-quiz`;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(link).then(() => {
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2500);
+      }).catch(() => {});
+    }
+  };
   
   // Active Quiz State (10 seconds per question)
   const QUESTION_SECONDS = 10;
+  const currentQuestionRef = useRef(0);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_SECONDS);
@@ -343,51 +401,136 @@ export default function QuantumQuiz() {
     }
   };
 
-  // Cross-tab synchronization: When admin starts quiz, attendees start too!
+  // Cross-device & Cross-tab Real-time Synchronization:
+  // 1. Fetch from server (/api/quiz/...)
+  // 2. BroadcastChannel for sub-millisecond local tab sync
+  // 3. 1-second background poll so phones & remote laptops auto-update
+  // 4. window 'storage' event listener for fallback
   useEffect(() => {
+    const fetchLobbyFromServer = async () => {
+      try {
+        const res = await fetch('/api/quiz/lobby');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setTeammates(processLobbyList(data));
+          }
+        }
+      } catch {
+        const local = getStoredLobby();
+        setTeammates(processLobbyList(local));
+      }
+    };
+
+    const fetchStatusFromServer = async () => {
+      try {
+        const res = await fetch('/api/quiz/status');
+        if (res.ok) {
+          const status = await res.json();
+          if (status && status.started && stageRef.current === 'WAITING_ROOM') {
+            setStage('QUIZ_ACTIVE');
+            setQuestionTimeLeft(QUESTION_SECONDS);
+          }
+          if (status && status.showLeaderboard !== undefined) {
+            setShowLeaderboard(Boolean(status.showLeaderboard));
+          }
+        }
+      } catch {}
+    };
+
+    const fetchLeaderboardFromServer = async () => {
+      try {
+        const res = await fetch('/api/quiz/leaderboard');
+        if (res.ok) {
+          const lb = await res.json();
+          if (Array.isArray(lb)) {
+            setLeaderboard(lb);
+          }
+        }
+      } catch {}
+    };
+
+    // BroadcastChannel message listener
+    let bc;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('HYNA_QUIZ_REALTIME_CHANNEL');
+        bc.onmessage = (event) => {
+          const msg = event.data;
+          if (!msg || !msg.type) return;
+
+          if (msg.type === 'LOBBY_UPDATE') {
+            fetchLobbyFromServer();
+          } else if (msg.type === 'QUIZ_START') {
+            if (stageRef.current === 'WAITING_ROOM') {
+              setStage('QUIZ_ACTIVE');
+              setQuestionTimeLeft(QUESTION_SECONDS);
+            }
+          } else if (msg.type === 'LEADERBOARD_REVEAL') {
+            setShowLeaderboard(true);
+          } else if (msg.type === 'LEADERBOARD_HIDE') {
+            setShowLeaderboard(false);
+          } else if (msg.type === 'LEADERBOARD_UPDATE') {
+            fetchLeaderboardFromServer();
+          }
+        };
+      }
+    } catch {}
+
+    // Initial fetch based on active stage
+    if (stage === 'WAITING_ROOM') {
+      fetchLobbyFromServer();
+      fetchStatusFromServer();
+    } else if (stage === 'QUIZ_RESULTS') {
+      fetchLeaderboardFromServer();
+      fetchStatusFromServer();
+    }
+
+    // 1-second interval polling for real-time multiplayer updates across devices
+    const pollInterval = setInterval(() => {
+      if (stageRef.current === 'WAITING_ROOM') {
+        fetchLobbyFromServer();
+        fetchStatusFromServer();
+      } else if (stageRef.current === 'QUIZ_RESULTS') {
+        fetchLeaderboardFromServer();
+        fetchStatusFromServer();
+      }
+    }, 1000);
+
+    // Storage event listener fallback
     const handleStorageChange = (e) => {
       if (e.key === 'HYNA_QUIZ_STATUS') {
         try {
           const val = JSON.parse(e.newValue);
-          if (val && val.started) {
+          if (val && val.started && stageRef.current === 'WAITING_ROOM') {
             setStage('QUIZ_ACTIVE');
             setQuestionTimeLeft(QUESTION_SECONDS);
           }
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
       if (e.key === 'HYNA_QUIZ_QUESTIONS') {
         setQuestions(getStoredQuestions());
       }
       if (e.key === 'HYNA_LOBBY_PARTICIPANTS') {
-        try {
-          const raw = JSON.parse(e.newValue);
-          if (Array.isArray(raw)) {
-            setTeammates(raw.map(p => ({
-              ...p,
-              isCurrentUser: p.email?.toLowerCase() === userEmail.toLowerCase(),
-              role: p.email?.toLowerCase() === userEmail.toLowerCase()
-                ? (p.isHost ? 'Session Host & Admin (You)' : 'Participant (You)')
-                : (p.isHost ? 'Session Host & Admin' : 'Participant')
-            })));
-            setLobbyNotice('A teammate joined the lobby');
-          }
-        } catch {
-          // ignore
-        }
+        fetchLobbyFromServer();
       }
       if (e.key === 'HYNA_LEADERBOARD_PUBLISHED') {
         setShowLeaderboard(e.newValue === 'true');
       }
       if (e.key === 'HYNA_QUIZ_LEADERBOARD') {
-        setLeaderboard(getStoredLeaderboard());
+        fetchLeaderboardFromServer();
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [userEmail]);
+    return () => {
+      clearInterval(pollInterval);
+      window.removeEventListener('storage', handleStorageChange);
+      if (bc) {
+        bc.close();
+      }
+    };
+  }, [stage]);
 
   // Active quiz 10-second per question timer (ONLY FOR ATTENDEES, NOT ADMIN)
   useEffect(() => {
@@ -455,6 +598,9 @@ export default function QuantumQuiz() {
 
     const adminCheck = trimmedEmail === ADMIN_EMAIL.toLowerCase();
     setIsAdmin(adminCheck);
+    isAdminRef.current = adminCheck;
+    userEmailRef.current = trimmedEmail;
+    stageRef.current = 'WAITING_ROOM';
 
     const userInitial = trimmedName.charAt(0).toUpperCase();
     const userObj = {
@@ -479,20 +625,36 @@ export default function QuantumQuiz() {
       // ignore
     }
 
-    setTeammates(updatedLobby.map(p => ({
-      ...p,
-      isCurrentUser: p.email?.toLowerCase() === trimmedEmail,
-      role: p.email?.toLowerCase() === trimmedEmail
-        ? (p.isHost ? 'Session Host & Admin (You)' : 'Participant (You)')
-        : (p.isHost ? 'Session Host & Admin' : 'Participant'),
-    })));
-
+    setTeammates(processLobbyList(updatedLobby, trimmedEmail));
     setLobbyNotice(adminCheck ? 'You are host. Ready to launch when you are.' : 'Waiting for session host to initiate quiz...');
+
+    // Post to backend server so participants on other devices/phones show up in real-time
+    try {
+      fetch('/api/quiz/lobby', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userObj)
+      }).then(res => res.json()).then(data => {
+        if (data && Array.isArray(data.lobby)) {
+          setTeammates(processLobbyList(data.lobby, trimmedEmail));
+        }
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+
+    // Broadcast across tabs
+    broadcastSync('LOBBY_UPDATE');
 
     // Reset quiz start status for fresh session if admin
     if (adminCheck) {
       try {
-        localStorage.setItem('HYNA_QUIZ_STATUS', JSON.stringify({ started: false }));
+        localStorage.setItem('HYNA_QUIZ_STATUS', JSON.stringify({ started: false, showLeaderboard: false }));
+        fetch('/api/quiz/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ started: false, showLeaderboard: false })
+        }).catch(() => {});
       } catch {
         // ignore
       }
@@ -505,9 +667,15 @@ export default function QuantumQuiz() {
   const handleHostStartQuiz = () => {
     try {
       localStorage.setItem('HYNA_QUIZ_STATUS', JSON.stringify({ started: true, startedAt: Date.now() }));
+      fetch('/api/quiz/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ started: true, showLeaderboard: false, startedAt: Date.now() })
+      }).catch(() => {});
     } catch {
       // ignore
     }
+    broadcastSync('QUIZ_START');
     setStage('QUIZ_ACTIVE');
   };
 
@@ -575,9 +743,15 @@ export default function QuantumQuiz() {
     setShowLeaderboard(true);
     try {
       localStorage.setItem('HYNA_LEADERBOARD_PUBLISHED', 'true');
+      fetch('/api/quiz/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showLeaderboard: true })
+      }).catch(() => {});
     } catch {
       // ignore
     }
+    broadcastSync('LEADERBOARD_REVEAL');
     setStage('QUIZ_RESULTS');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -684,10 +858,16 @@ export default function QuantumQuiz() {
 
     try {
       localStorage.setItem('HYNA_QUIZ_LEADERBOARD', JSON.stringify(updatedLb));
+      fetch('/api/quiz/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(participantRecord)
+      }).catch(() => {});
     } catch {
       // ignore
     }
 
+    broadcastSync('LEADERBOARD_UPDATE', participantRecord);
     setLeaderboard(updatedLb);
     setStage('QUIZ_RESULTS');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -706,19 +886,27 @@ export default function QuantumQuiz() {
     setShowLeaderboard(nextVal);
     try {
       localStorage.setItem('HYNA_LEADERBOARD_PUBLISHED', String(nextVal));
+      fetch('/api/quiz/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showLeaderboard: nextVal })
+      }).catch(() => {});
     } catch {
       // ignore
     }
+    broadcastSync(nextVal ? 'LEADERBOARD_REVEAL' : 'LEADERBOARD_HIDE');
   };
 
   const handleClearLeaderboard = () => {
     if (window.confirm('Clear all participant results from the leaderboard?')) {
       try {
         localStorage.removeItem('HYNA_QUIZ_LEADERBOARD');
+        fetch('/api/quiz/leaderboard', { method: 'DELETE' }).catch(() => {});
       } catch {
         // ignore
       }
       setLeaderboard([]);
+      broadcastSync('LEADERBOARD_UPDATE');
     }
   };
 
@@ -728,6 +916,7 @@ export default function QuantumQuiz() {
     setQuestionTimeLeft(QUESTION_SECONDS);
     setTotalTimeSpent(0);
     setStage('NAME_ENTRY');
+    stageRef.current = 'NAME_ENTRY';
     setTeammates([]);
   };
 
@@ -736,10 +925,22 @@ export default function QuantumQuiz() {
       const selfOnly = teammates.filter(t => t.isCurrentUser);
       try {
         localStorage.setItem('HYNA_LOBBY_PARTICIPANTS', JSON.stringify(selfOnly.map(p => ({ ...p, isCurrentUser: false }))));
+        fetch('/api/quiz/lobby', { method: 'DELETE' })
+          .then(() => {
+            if (selfOnly.length > 0) {
+              return fetch('/api/quiz/lobby', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selfOnly[0])
+              });
+            }
+          })
+          .catch(() => {});
       } catch {
         // ignore
       }
       setTeammates(selfOnly);
+      broadcastSync('LOBBY_UPDATE');
     }
   };
 
@@ -1200,6 +1401,23 @@ export default function QuantumQuiz() {
                     </p>
                   </>
                 )}
+              </div>
+
+              {/* Share Room Link Banner */}
+              <div className="room-share-bar">
+                <div className="room-share-info">
+                  <Share2 size={16} className="share-icon" />
+                  <span className="room-share-label">Join URL:</span>
+                  <code className="room-share-url">{typeof window !== 'undefined' ? `${window.location.origin}/quantum-quiz` : ''}</code>
+                </div>
+                <button
+                  type="button"
+                  className={`btn-copy-link ${copiedLink ? 'copied' : ''}`}
+                  onClick={handleCopyRoomLink}
+                >
+                  {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{copiedLink ? 'Copied URL!' : 'Copy Join Link'}</span>
+                </button>
               </div>
 
               {/* Lobby Status Banner */}

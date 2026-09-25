@@ -456,6 +456,81 @@
   font-weight: 700;
 }
 
+/* Room Share Link Bar */
+.room-share-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(14, 18, 36, 0.75);
+  border: 1px dashed rgba(0, 194, 255, 0.4);
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(10px);
+  flex-wrap: wrap;
+}
+
+.room-share-info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #94A3B8;
+  font-size: 0.88rem;
+  flex: 1;
+  min-width: 240px;
+}
+
+.room-share-info .share-icon {
+  color: #00C2FF;
+  flex-shrink: 0;
+}
+
+.room-share-label {
+  font-weight: 600;
+  color: #E2E8F0;
+  white-space: nowrap;
+}
+
+.room-share-url {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(0, 194, 255, 0.25);
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: #00C2FF;
+  word-break: break-all;
+}
+
+.btn-copy-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(0, 194, 255, 0.12);
+  border: 1px solid rgba(0, 194, 255, 0.35);
+  color: #00C2FF;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.95rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-copy-link:hover {
+  background: rgba(0, 194, 255, 0.25);
+  border-color: #00C2FF;
+  transform: translateY(-1px);
+}
+
+.btn-copy-link.copied {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10B981;
+  color: #10B981;
+}
+
 /* Status Banner */
 .lobby-status-banner {
   display: flex;
