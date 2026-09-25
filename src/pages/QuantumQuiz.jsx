@@ -985,7 +985,7 @@ export default function QuantumQuiz() {
     };
   };
 
-  const finalizeQuiz = (finalAnswers = selectedAnswers) => {
+  const finalizeQuiz = async (finalAnswers = selectedAnswers) => {
     // If admin is browsing or ends quiz, admin does NOT get saved as competitor
     if (isAdmin) {
       handleHostRevealLeaderboard();
