@@ -313,6 +313,25 @@ export default function QuantumQuiz() {
   const [newCorrectIndex, setNewCorrectIndex] = useState(0);
   const [newExplanation, setNewExplanation] = useState('');
   const [adminFeedback, setAdminFeedback] = useState('');
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('HYNA_SUPABASE_URL') || import.meta.env.VITE_SUPABASE_URL || '' : '')
+  );
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('HYNA_SUPABASE_KEY') || import.meta.env.VITE_SUPABASE_ANON_KEY || '' : '')
+  );
+  const [cloudSaved, setCloudSaved] = useState(false);
+
+  const handleSaveSupabaseConfig = (e) => {
+    e.preventDefault();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('HYNA_SUPABASE_URL', supabaseUrlInput.trim());
+      localStorage.setItem('HYNA_SUPABASE_KEY', supabaseKeyInput.trim());
+      setCloudSaved(true);
+      setTimeout(() => {
+        window.location.reload();
+      }, 700);
+    }
+  };
 
   // Waiting Room state (seeded with stored lobby)
   const [teammates, setTeammates] = useState(getStoredLobby);
@@ -1297,6 +1316,43 @@ export default function QuantumQuiz() {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Cloud Database (Supabase) - Cross-Network Realtime Multiplayer */}
+              <div className="admin-cloud-sync-card">
+                <div className="admin-cloud-header">
+                  <div className="admin-cloud-title-wrap">
+                    <Radio size={18} className="cloud-radio-icon" />
+                    <h3 className="admin-section-title">Cloud Multiplayer Sync (Supabase)</h3>
+                  </div>
+                  <span className={`admin-cloud-status ${isSupabaseConfigured ? 'status-connected' : 'status-local'}`}>
+                    {isSupabaseConfigured ? '🟢 Cloud Realtime Active (Any Network)' : '🟡 Local Mode (Same Wi-Fi)'}
+                  </span>
+                </div>
+                <p className="admin-cloud-desc">
+                  Connect your Supabase project so participants on <strong>different networks (mobile 4G/5G, other Wi-Fi)</strong> can join and show up in the lobby in real time.
+                </p>
+                <form onSubmit={handleSaveSupabaseConfig} className="admin-cloud-form">
+                  <div className="cloud-inputs-row">
+                    <input
+                      type="url"
+                      placeholder="Project URL: https://xyz.supabase.co"
+                      value={supabaseUrlInput}
+                      onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                      className="admin-input-text cloud-input"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Anon Public Key (from Settings > API)"
+                      value={supabaseKeyInput}
+                      onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                      className="admin-input-text cloud-input"
+                    />
+                    <button type="submit" className="btn-cloud-save">
+                      {cloudSaved ? 'Connecting...' : (isSupabaseConfigured ? 'Update Cloud Key' : 'Connect Cloud')}
+                    </button>
+                  </div>
+                </form>
               </div>
 
               {/* Question Add Form */}

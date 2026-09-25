@@ -964,6 +964,88 @@
   gap: 2rem;
 }
 
+/* Cloud Sync Card in Admin Panel */
+.admin-cloud-sync-card {
+  background: rgba(18, 12, 28, 0.85);
+  border: 1.5px solid rgba(0, 194, 255, 0.35);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+}
+
+.admin-cloud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-cloud-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cloud-radio-icon {
+  color: #00C2FF;
+}
+
+.admin-cloud-status {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+}
+
+.admin-cloud-status.status-connected {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid #10B981;
+  color: #10B981;
+}
+
+.admin-cloud-status.status-local {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid #F59E0B;
+  color: #F59E0B;
+}
+
+.admin-cloud-desc {
+  font-size: 0.85rem;
+  color: #CBD5E1;
+  margin: 0 0 1rem;
+  line-height: 1.4;
+}
+
+.cloud-inputs-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cloud-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.btn-cloud-save {
+  background: linear-gradient(135deg, #00C2FF, #0077FF);
+  color: #FFFFFF;
+  border: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-cloud-save:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
 .admin-section-title {
   display: flex;
   align-items: center;
