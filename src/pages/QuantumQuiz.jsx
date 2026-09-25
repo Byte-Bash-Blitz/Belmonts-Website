@@ -22,7 +22,15 @@ import {
   Mail,
   User,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Trophy,
+  Eye,
+  EyeOff,
+  Zap,
+  Flame,
+  Medal,
+  Timer,
+  BarChart3
 } from 'lucide-react';
 import './QuantumQuiz.css';
 
@@ -123,6 +131,101 @@ const DEFAULT_QUIZ_QUESTIONS = [
     ],
     correct: 0,
     explanation: "Quantum supremacy refers to the demonstration that a programmable quantum device can solve a problem that no classical supercomputer can solve in any feasible amount of time."
+  },
+  {
+    id: 11,
+    question: "Which quantum key distribution (QKD) protocol was proposed by Charles Bennett and Gilles Brassard in 1984?",
+    options: ["BB84", "E91", "B92", "COW Protocol"],
+    correct: 0,
+    explanation: "BB84 was the first quantum cryptography protocol, using polarized photons to establish a secure shared secret key."
+  },
+  {
+    id: 12,
+    question: "What is the primary function of a CNOT (Controlled-NOT) gate?",
+    options: [
+      "It measures a qubit into classical binary",
+      "It flips the target qubit if and only if the control qubit is in state |1⟩",
+      "It collapses entanglement between two qubits",
+      "It applies an unconditional 180-degree phase shift"
+    ],
+    correct: 1,
+    explanation: "The CNOT gate acts on two qubits, inverting the target qubit only when the control qubit is in state |1⟩."
+  },
+  {
+    id: 13,
+    question: "Which geometric sphere is used to visualize the state of a single two-level quantum qubit?",
+    options: ["Bloch Sphere", "Poincaré Sphere", "Riemann Sphere", "Euler Sphere"],
+    correct: 0,
+    explanation: "The Bloch sphere is a geometrical representation of the pure state space of a two-level quantum mechanical system (qubit)."
+  },
+  {
+    id: 14,
+    question: "In modern quantum terminology, what does 'NISQ' stand for?",
+    options: [
+      "Next Integrated Superconducting Qubits",
+      "Noisy Intermediate-Scale Quantum",
+      "Non-Interfering Symmetric Quantum",
+      "Networked Information Security Quantum"
+    ],
+    correct: 1,
+    explanation: "NISQ refers to current era quantum processors with tens to hundreds of qubits that are not yet fault-tolerant."
+  },
+  {
+    id: 15,
+    question: "Which quantum phenomenon allows subatomic particles to pass through a barrier they classically lack energy to overcome?",
+    options: ["Quantum Tunneling", "Quantum Teleportation", "Quantum Annealing", "Wavepacket Decoherence"],
+    correct: 0,
+    explanation: "Quantum tunneling occurs when a wave function penetrates and crosses a potential energy barrier."
+  },
+  {
+    id: 16,
+    question: "What is the central purpose of Quantum Error Correction (QEC) such as the Surface Code?",
+    options: [
+      "To speed up clock cycle frequencies by 10x",
+      "To protect logical quantum information by distributing it across multiple physical qubits",
+      "To replace cryogenic dilution refrigerators",
+      "To convert quantum states into classical RAM"
+    ],
+    correct: 1,
+    explanation: "Quantum error correction protects fragile quantum information from noise and decoherence using redundant physical qubits."
+  },
+  {
+    id: 17,
+    question: "Which company developed the 53-qubit 'Sycamore' processor that performed a benchmark calculation in 200 seconds in 2019?",
+    options: ["IBM", "Google Quantum AI", "Rigetti Computing", "D-Wave Systems"],
+    correct: 1,
+    explanation: "Google Quantum AI demonstrated quantum computational advantage using their Sycamore processor in 2019."
+  },
+  {
+    id: 18,
+    question: "What are 'Bell States' in quantum information theory?",
+    options: [
+      "States of absolute zero temperature",
+      "Four specific maximally entangled two-qubit quantum states",
+      "Qubit states that cannot undergo decoherence",
+      "Classical approximations of quantum spin"
+    ],
+    correct: 1,
+    explanation: "Bell states are four specific maximally entangled two-qubit states that form an orthonormal basis for quantum teleportation."
+  },
+  {
+    id: 19,
+    question: "In quantum teleportation, how many classical bits must be transmitted to complete the teleportation of a single qubit?",
+    options: ["1 classical bit", "2 classical bits", "4 classical bits", "No classical communication is needed"],
+    correct: 1,
+    explanation: "Quantum teleportation requires sending 2 classical bits following a Bell state measurement to perform the reconstruction."
+  },
+  {
+    id: 20,
+    question: "How does Quantum Annealing differ from Universal Gate-Based Quantum Computing?",
+    options: [
+      "Quantum annealing operates only at room temperature",
+      "Quantum annealing is tailored for combinatorial optimization problems, whereas gate-based systems run arbitrary quantum algorithms",
+      "Quantum annealing does not use quantum mechanics",
+      "Gate-based systems cannot execute Shor's algorithm"
+    ],
+    correct: 1,
+    explanation: "Quantum annealing finds global minima for optimization problems, while gate-based quantum computers can execute universal quantum logic circuits."
   }
 ];
 
@@ -144,7 +247,7 @@ function getStoredQuestions() {
     const raw = localStorage.getItem('HYNA_QUIZ_QUESTIONS');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed) && parsed.length >= 20) {
         return parsed;
       }
     }
@@ -152,6 +255,32 @@ function getStoredQuestions() {
     // fallback
   }
   return DEFAULT_QUIZ_QUESTIONS;
+}
+
+function getStoredLeaderboard() {
+  try {
+    const raw = localStorage.getItem('HYNA_QUIZ_LEADERBOARD');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return (a.timeTaken || 0) - (b.timeTaken || 0);
+        });
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return [];
+}
+
+function getStoredLeaderboardVisibility() {
+  try {
+    return localStorage.getItem('HYNA_LEADERBOARD_PUBLISHED') === 'true';
+  } catch {
+    return false;
+  }
 }
 
 export default function QuantumQuiz() {
@@ -182,10 +311,17 @@ export default function QuantumQuiz() {
   const [teammates, setTeammates] = useState([]);
   const [lobbyNotice, setLobbyNotice] = useState('Waiting for session host to initiate quiz...');
   
-  // Active Quiz State
+  // Active Quiz State (10 seconds per question)
+  const QUESTION_SECONDS = 10;
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+  const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_SECONDS);
+  const [totalTimeSpent, setTotalTimeSpent] = useState(0);
+
+  // Leaderboard state
+  const [leaderboard, setLeaderboard] = useState(getStoredLeaderboard);
+  const [showLeaderboard, setShowLeaderboard] = useState(getStoredLeaderboardVisibility);
+  const [inspectParticipant, setInspectParticipant] = useState(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -209,6 +345,7 @@ export default function QuantumQuiz() {
           const val = JSON.parse(e.newValue);
           if (val && val.started) {
             setStage('QUIZ_ACTIVE');
+            setQuestionTimeLeft(QUESTION_SECONDS);
           }
         } catch {
           // ignore
@@ -234,27 +371,47 @@ export default function QuantumQuiz() {
           // ignore
         }
       }
+      if (e.key === 'HYNA_LEADERBOARD_PUBLISHED') {
+        setShowLeaderboard(e.newValue === 'true');
+      }
+      if (e.key === 'HYNA_QUIZ_LEADERBOARD') {
+        setLeaderboard(getStoredLeaderboard());
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [userEmail]);
 
-  // Active quiz 10-minute timer
+  // Active quiz 10-second per question timer
   useEffect(() => {
-    if (stage !== 'QUIZ_ACTIVE' || timeLeft <= 0) return;
+    if (stage !== 'QUIZ_ACTIVE') return;
+
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
+      setTotalTimeSpent(prev => prev + 1);
+
+      setQuestionTimeLeft(prev => {
         if (prev <= 1) {
-          clearInterval(timer);
-          setStage('QUIZ_RESULTS');
-          return 0;
+          // Time expired for this question! Auto advance to next question
+          setCurrentQuestion(curr => {
+            if (curr < questions.length - 1) {
+              return curr + 1;
+            } else {
+              // Final question finished on timeout!
+              setTimeout(() => {
+                handleSubmitQuiz();
+              }, 50);
+              return curr;
+            }
+          });
+          return QUESTION_SECONDS;
         }
         return prev - 1;
       });
     }, 1000);
+
     return () => clearInterval(timer);
-  }, [stage, timeLeft]);
+  }, [stage, questions.length]);
 
   // Check if entered email matches admin
   const isInputAdmin = (emailStr) => {
@@ -393,9 +550,9 @@ export default function QuantumQuiz() {
   };
 
   const handleResetDefaultQuestions = () => {
-    if (window.confirm('Reset all questions to default 10 Quantum Computing questions?')) {
+    if (window.confirm('Reset all questions to default 20 Quantum Computing questions?')) {
       updateQuestions(DEFAULT_QUIZ_QUESTIONS);
-      setAdminFeedback('Reset to default questions.');
+      setAdminFeedback('Reset to default 20 questions.');
       setTimeout(() => setAdminFeedback(''), 3000);
     }
   };
@@ -411,24 +568,88 @@ export default function QuantumQuiz() {
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
+      setQuestionTimeLeft(QUESTION_SECONDS);
+    } else {
+      finalizeQuiz(selectedAnswers);
     }
   };
 
   const handlePrev = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion(prev => prev - 1);
+      setQuestionTimeLeft(QUESTION_SECONDS);
     }
   };
 
-  const handleSubmitQuiz = () => {
+  const finalizeQuiz = (finalAnswers = selectedAnswers) => {
+    let finalScore = 0;
+    questions.forEach((q, idx) => {
+      if (finalAnswers[idx] === q.correct) {
+        finalScore++;
+      }
+    });
+
+    const participantRecord = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: userName || 'Participant',
+      email: userEmail || 'anonymous@hyna.studio',
+      score: finalScore,
+      totalQuestions: questions.length,
+      percentage: Math.round((finalScore / questions.length) * 100),
+      timeTaken: totalTimeSpent,
+      completedAt: Date.now(),
+      answers: finalAnswers,
+      isHost: isAdmin
+    };
+
+    const currentLb = getStoredLeaderboard();
+    const filtered = currentLb.filter(item => item.email?.toLowerCase() !== userEmail.toLowerCase());
+    const updatedLb = [...filtered, participantRecord].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.timeTaken || 0) - (b.timeTaken || 0);
+    });
+
+    try {
+      localStorage.setItem('HYNA_QUIZ_LEADERBOARD', JSON.stringify(updatedLb));
+    } catch {
+      // ignore
+    }
+
+    setLeaderboard(updatedLb);
     setStage('QUIZ_RESULTS');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSubmitQuiz = () => {
+    finalizeQuiz(selectedAnswers);
+  };
+
+  const toggleLeaderboardPublish = () => {
+    const nextVal = !showLeaderboard;
+    setShowLeaderboard(nextVal);
+    try {
+      localStorage.setItem('HYNA_LEADERBOARD_PUBLISHED', String(nextVal));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleClearLeaderboard = () => {
+    if (window.confirm('Clear all participant results from the leaderboard?')) {
+      try {
+        localStorage.removeItem('HYNA_QUIZ_LEADERBOARD');
+      } catch {
+        // ignore
+      }
+      setLeaderboard([]);
+    }
   };
 
   const handleResetSession = () => {
     setSelectedAnswers({});
     setCurrentQuestion(0);
-    setTimeLeft(600);
+    setQuestionTimeLeft(QUESTION_SECONDS);
+    setTotalTimeSpent(0);
     setStage('NAME_ENTRY');
     setTeammates([]);
   };
@@ -455,8 +676,6 @@ export default function QuantumQuiz() {
     return score;
   };
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
   const score = calculateScore();
   const percentage = Math.round((score / questions.length) * 100);
   const answeredCount = Object.keys(selectedAnswers).length;
@@ -485,26 +704,42 @@ export default function QuantumQuiz() {
           <div className="topbar-right-actions">
             {/* Admin Badge & Panel Toggle */}
             {isAdmin && (
-              <button
-                type="button"
-                className="admin-access-btn"
-                onClick={() => setShowAdminPanel(true)}
-                title="Manage Questions & Quiz Settings"
-              >
-                <Crown size={15} className="admin-crown-icon" />
-                <span>Admin Panel</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={`admin-broadcast-topbar-btn ${showLeaderboard ? 'is-live' : 'is-hidden'}`}
+                  onClick={toggleLeaderboardPublish}
+                  title={showLeaderboard ? "Leaderboard is LIVE to all attendees. Click to hide." : "Leaderboard is HIDDEN. Click to broadcast to everyone."}
+                >
+                  {showLeaderboard ? <Eye size={14} /> : <EyeOff size={14} />}
+                  <span>{showLeaderboard ? 'Leaderboard: Live' : 'Leaderboard: Hidden'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="admin-access-btn"
+                  onClick={() => setShowAdminPanel(true)}
+                  title="Manage Questions & Quiz Settings"
+                >
+                  <Crown size={15} className="admin-crown-icon" />
+                  <span>Admin Panel</span>
+                </button>
+              </>
             )}
 
             {stage === 'QUIZ_ACTIVE' ? (
-              <div className="quiz-timer-badge" aria-label="Time remaining">
-                <Clock size={16} />
-                <span>{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</span>
+              <div className={`quiz-timer-badge ${questionTimeLeft <= 3 ? 'timer-alert' : ''}`} aria-label="Question countdown">
+                <Timer size={16} />
+                <span>00:{String(questionTimeLeft).padStart(2, '0')}</span>
               </div>
             ) : stage === 'WAITING_ROOM' ? (
               <div className="quiz-lobby-counter">
                 <Users size={16} />
                 <span>{teammates.length} in Lobby</span>
+              </div>
+            ) : stage === 'QUIZ_RESULTS' ? (
+              <div className="quiz-results-topbar-tag">
+                <Trophy size={15} />
+                <span>Leaderboard</span>
               </div>
             ) : (
               <div className="quiz-step-indicator">
@@ -552,6 +787,57 @@ export default function QuantumQuiz() {
             )}
 
             <div className="admin-modal-body">
+              {/* Leaderboard Management & Broadcast Control */}
+              <div className="admin-leaderboard-control-card">
+                <div className="admin-lb-card-header">
+                  <div className="admin-lb-title-wrap">
+                    <Trophy size={18} className="trophy-gold" />
+                    <h3 className="admin-section-title">Live Leaderboard Broadcast</h3>
+                  </div>
+                  <span className={`admin-lb-status-badge ${showLeaderboard ? 'is-live' : 'is-hidden'}`}>
+                    {showLeaderboard ? '🟢 LIVE (Visible to Attendees)' : '🔒 HIDDEN (Private to Host)'}
+                  </span>
+                </div>
+
+                <p className="admin-lb-desc">
+                  Control whether participants can view the live leaderboard rankings and inspect teammate scores after completing the quiz.
+                </p>
+
+                <div className="admin-lb-actions-grid">
+                  <button
+                    type="button"
+                    className={`btn-lb-toggle ${showLeaderboard ? 'btn-lb-hide' : 'btn-lb-show'}`}
+                    onClick={toggleLeaderboardPublish}
+                  >
+                    {showLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
+                    <span>{showLeaderboard ? 'Hide Leaderboard from Attendees' : 'Publish Leaderboard to Everyone'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-lb-view"
+                    onClick={() => {
+                      setShowAdminPanel(false);
+                      setStage('QUIZ_RESULTS');
+                    }}
+                  >
+                    <BarChart3 size={16} />
+                    <span>View Leaderboard ({leaderboard.length} submissions)</span>
+                  </button>
+
+                  {leaderboard.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn-lb-clear"
+                      onClick={handleClearLeaderboard}
+                    >
+                      <Trash2 size={15} />
+                      <span>Reset Scores</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Question Add Form */}
               <div className="admin-add-section">
                 <h3 className="admin-section-title">
@@ -625,7 +911,7 @@ export default function QuantumQuiz() {
                       onClick={handleResetDefaultQuestions}
                     >
                       <RefreshCw size={15} />
-                      <span>Reset to Default 10 Questions</span>
+                      <span>Reset to Default 20 Questions</span>
                     </button>
                   </div>
                 </form>
@@ -958,7 +1244,7 @@ export default function QuantumQuiz() {
               <div className="waiting-footer">
                 <div className="waiting-footer-info">
                   <ShieldCheck size={18} className="shield-icon" />
-                  <span>{questions.length} Questions • 10 Minutes • 1 Attempt • Automatic Scoring</span>
+                  <span>{questions.length} Questions • 10 Seconds per Question • Live Leaderboard</span>
                 </div>
 
                 {isAdmin && (
@@ -986,11 +1272,11 @@ export default function QuantumQuiz() {
           )}
 
           {/* ===============================================================
-              STAGE 3: ACTIVE QUIZ
+              STAGE 3: ACTIVE QUIZ (10 SECONDS PER QUESTION)
              =============================================================== */}
           {stage === 'QUIZ_ACTIVE' && (
             <div className="quiz-active-card">
-              {/* Progress Bar & User Pill */}
+              {/* Progress & Speed Timer Bar */}
               <div className="quiz-progress-section">
                 <div className="quiz-progress-text">
                   <div className="progress-left-info">
@@ -1006,6 +1292,26 @@ export default function QuantumQuiz() {
                   <div
                     className="quiz-progress-fill"
                     style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* 10-Second Countdown Visual Bar */}
+              <div className="speed-timer-bar-wrap">
+                <div className="speed-timer-header">
+                  <div className="speed-timer-indicator">
+                    <Timer size={18} className={questionTimeLeft <= 3 ? 'timer-icon-alert' : 'timer-icon-active'} />
+                    <span className={`speed-timer-digits ${questionTimeLeft <= 3 ? 'danger' : questionTimeLeft <= 5 ? 'warn' : 'normal'}`}>
+                      {questionTimeLeft}s
+                    </span>
+                    <span className="speed-timer-label">remaining for this question</span>
+                  </div>
+                  <span className="speed-timer-subline">⚡ Auto-advances when time expires</span>
+                </div>
+                <div className="speed-timer-track">
+                  <div
+                    className={`speed-timer-fill ${questionTimeLeft <= 3 ? 'danger' : questionTimeLeft <= 5 ? 'warn' : 'normal'}`}
+                    style={{ width: `${(questionTimeLeft / 10) * 100}%` }}
                   />
                 </div>
               </div>
@@ -1057,7 +1363,10 @@ export default function QuantumQuiz() {
                       key={i}
                       type="button"
                       className={`dot-pill ${i === currentQuestion ? 'active' : ''} ${selectedAnswers[i] !== undefined ? 'answered' : ''}`}
-                      onClick={() => setCurrentQuestion(i)}
+                      onClick={() => {
+                        setCurrentQuestion(i);
+                        setQuestionTimeLeft(QUESTION_SECONDS);
+                      }}
                       aria-label={`Jump to question ${i + 1}`}
                     >
                       {i + 1}
@@ -1071,7 +1380,7 @@ export default function QuantumQuiz() {
                     className="quiz-nav-btn next"
                     onClick={handleNext}
                   >
-                    Next
+                    Next Question
                   </button>
                 ) : (
                   <button
@@ -1087,70 +1396,324 @@ export default function QuantumQuiz() {
           )}
 
           {/* ===============================================================
-              STAGE 4: RESULTS
+              STAGE 4: RESULTS & LIVE LEADERBOARD
              =============================================================== */}
           {stage === 'QUIZ_RESULTS' && (
             <div className="quiz-results-card">
-              <div className="results-header">
-                <div className="results-trophy-wrap">
-                  <Award size={48} className="results-trophy" />
-                </div>
-                <h1 className="results-title">Quiz Completed!</h1>
-                <p className="results-subtitle">
-                  Great effort, <strong className="user-highlight">{userName}</strong>! Here is your performance in Weekly Bash #37.
-                </p>
-              </div>
+              {/* Leaderboard Visible: Show Full Podium & Participants Table */}
+              {(showLeaderboard || isAdmin) ? (
+                <div className="leaderboard-experience">
+                  <div className="results-header">
+                    <div className="results-trophy-wrap">
+                      <Trophy size={48} className="results-trophy trophy-gold" />
+                    </div>
+                    <div className="lb-status-pill-wrap">
+                      <span className={`lb-public-pill ${showLeaderboard ? 'is-live' : 'is-admin-preview'}`}>
+                        {showLeaderboard ? '🟢 Official Live Leaderboard' : '🔒 Host Preview (Hidden from Attendees)'}
+                      </span>
+                    </div>
+                    <h1 className="results-title">Weekly Bash #37 Leaderboard</h1>
+                    <p className="results-subtitle">
+                      Final rankings based on accuracy and completion speed across all {questions.length} Quantum Computing questions.
+                    </p>
+                  </div>
 
-              <div className="score-summary-box">
-                <div className="score-big-circle">
-                  <span className="score-big-number">{score}</span>
-                  <span className="score-total">/ {questions.length}</span>
-                </div>
-                <div className="score-details">
-                  <span className="score-status">
-                    {score / questions.length >= 0.8
-                      ? '🎉 Outstanding Knowledge!'
-                      : score / questions.length >= 0.5
-                      ? '👍 Great Effort!'
-                      : '📚 Keep Learning!'}
-                  </span>
-                  <p className="score-percentage">Accuracy: {percentage}% • 10 Minutes Max</p>
-                </div>
-              </div>
-
-              <div className="results-review-list">
-                <h3 className="review-title">Review Answers</h3>
-                {questions.map((q, idx) => {
-                  const userAnswer = selectedAnswers[idx];
-                  const isCorrect = userAnswer === q.correct;
-                  return (
-                    <div key={q.id || idx} className={`review-item ${isCorrect ? 'correct' : 'incorrect'}`}>
-                      <div className="review-item-header">
-                        <span className="review-icon">
-                          {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                        </span>
-                        <span className="review-question-text">Q{idx + 1}: {q.question}</span>
+                  {/* Host Controls Banner */}
+                  {isAdmin && (
+                    <div className="admin-lb-action-banner">
+                      <div className="admin-lb-banner-info">
+                        <Crown size={18} className="crown-icon" />
+                        <span><strong>Host Controls:</strong> Broadcast is currently <strong>{showLeaderboard ? 'VISIBLE TO ATTENDEES' : 'HIDDEN FROM ATTENDEES'}</strong></span>
                       </div>
-                      <div className="review-answer-details">
-                        <div className="answer-row">
-                          <span className="ans-label">Your Answer:</span>
-                          <span className={`ans-val ${isCorrect ? 'good' : 'bad'}`}>
-                            {userAnswer !== undefined ? q.options[userAnswer] : 'No answer selected'}
-                          </span>
-                        </div>
-                        {!isCorrect && (
-                          <div className="answer-row">
-                            <span className="ans-label">Correct Answer:</span>
-                            <span className="ans-val good">{q.options[q.correct]}</span>
-                          </div>
-                        )}
-                        <p className="explanation-text">{q.explanation}</p>
+                      <div className="admin-lb-banner-buttons">
+                        <button
+                          type="button"
+                          className={`btn-lb-banner-toggle ${showLeaderboard ? 'btn-danger' : 'btn-success'}`}
+                          onClick={toggleLeaderboardPublish}
+                        >
+                          {showLeaderboard ? <EyeOff size={15} /> : <Eye size={15} />}
+                          <span>{showLeaderboard ? 'Hide Leaderboard from Attendees' : 'Publish Leaderboard to Everyone'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-lb-banner-clear"
+                          onClick={handleClearLeaderboard}
+                        >
+                          <Trash2 size={14} />
+                          <span>Clear Scores</span>
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  )}
 
+                  {/* Top 3 Podium Cards */}
+                  {leaderboard.length > 0 && (
+                    <div className="leaderboard-podium-grid">
+                      {/* 2nd Place (Silver) */}
+                      {leaderboard[1] && (
+                        <div className="podium-card rank-2">
+                          <div className="podium-badge-silver">🥈 2ND PLACE</div>
+                          <div className="podium-avatar">{leaderboard[1].name.charAt(0).toUpperCase()}</div>
+                          <h3 className="podium-name">{leaderboard[1].name}</h3>
+                          <div className="podium-score-pill">
+                            <span className="score-val">{leaderboard[1].score}/{questions.length}</span>
+                            <span className="time-val">{leaderboard[1].timeTaken || 0}s</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-podium-inspect"
+                            onClick={() => setInspectParticipant(leaderboard[1])}
+                          >
+                            <Eye size={13} />
+                            <span>View Quiz</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 1st Place (Gold - Elevated) */}
+                      {leaderboard[0] && (
+                        <div className="podium-card rank-1">
+                          <div className="podium-crown">👑</div>
+                          <div className="podium-badge-gold">🥇 1ST PLACE</div>
+                          <div className="podium-avatar gold-glow">{leaderboard[0].name.charAt(0).toUpperCase()}</div>
+                          <h3 className="podium-name">{leaderboard[0].name}</h3>
+                          <div className="podium-score-pill gold">
+                            <span className="score-val">{leaderboard[0].score}/{questions.length}</span>
+                            <span className="time-val">{leaderboard[0].timeTaken || 0}s</span>
+                          </div>
+                          <span className="podium-accuracy">{leaderboard[0].percentage}% Accuracy</span>
+                          <button
+                            type="button"
+                            className="btn-podium-inspect primary"
+                            onClick={() => setInspectParticipant(leaderboard[0])}
+                          >
+                            <Eye size={13} />
+                            <span>View Quiz</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 3rd Place (Bronze) */}
+                      {leaderboard[2] && (
+                        <div className="podium-card rank-3">
+                          <div className="podium-badge-bronze">🥉 3RD PLACE</div>
+                          <div className="podium-avatar">{leaderboard[2].name.charAt(0).toUpperCase()}</div>
+                          <h3 className="podium-name">{leaderboard[2].name}</h3>
+                          <div className="podium-score-pill">
+                            <span className="score-val">{leaderboard[2].score}/{questions.length}</span>
+                            <span className="time-val">{leaderboard[2].timeTaken || 0}s</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-podium-inspect"
+                            onClick={() => setInspectParticipant(leaderboard[2])}
+                          >
+                            <Eye size={13} />
+                            <span>View Quiz</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Complete Participants Table */}
+                  <div className="leaderboard-table-section">
+                    <div className="lb-table-header-row">
+                      <h2 className="lb-table-title">
+                        <Users size={18} />
+                        All Competitors ({leaderboard.length})
+                      </h2>
+                      <span className="lb-sort-hint">Ranked by Score, then Speed</span>
+                    </div>
+
+                    <div className="lb-table-wrapper">
+                      <table className="lb-table">
+                        <thead>
+                          <tr>
+                            <th>Rank</th>
+                            <th>Participant</th>
+                            <th>Email</th>
+                            <th>Score</th>
+                            <th>Accuracy</th>
+                            <th>Speed</th>
+                            <th>Participant Quiz</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leaderboard.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="lb-empty-cell">
+                                No participants have finished the quiz yet. Submissions will appear here in real time!
+                              </td>
+                            </tr>
+                          ) : (
+                            leaderboard.map((item, index) => {
+                              const isMe = item.email?.toLowerCase() === userEmail?.toLowerCase();
+                              return (
+                                <tr key={item.id || index} className={`lb-row ${isMe ? 'my-row' : ''}`}>
+                                  <td className="rank-cell">
+                                    {index === 0 ? '🥇 #1' : index === 1 ? '🥈 #2' : index === 2 ? '🥉 #3' : `#${index + 1}`}
+                                  </td>
+                                  <td className="user-cell">
+                                    <div className="user-cell-wrap">
+                                      <span className="table-avatar">{item.name?.charAt(0).toUpperCase() || 'P'}</span>
+                                      <span className="table-name">{item.name}</span>
+                                      {isMe && <span className="you-pill">YOU</span>}
+                                      {item.isHost && <span className="host-pill">HOST</span>}
+                                    </div>
+                                  </td>
+                                  <td className="email-cell">{item.email}</td>
+                                  <td className="score-cell">
+                                    <strong>{item.score}</strong> / {item.totalQuestions || questions.length}
+                                  </td>
+                                  <td className="accuracy-cell">
+                                    <div className="accuracy-bar-wrap">
+                                      <span>{item.percentage}%</span>
+                                      <div className="acc-mini-track">
+                                        <div className="acc-mini-fill" style={{ width: `${item.percentage}%` }} />
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="time-cell">
+                                    <Clock size={12} />
+                                    <span>{item.timeTaken || 0}s</span>
+                                  </td>
+                                  <td className="action-cell">
+                                    <button
+                                      type="button"
+                                      className="btn-table-inspect"
+                                      onClick={() => setInspectParticipant(item)}
+                                      title={`View ${item.name}'s quiz answers`}
+                                    >
+                                      <Eye size={13} />
+                                      <span>View Quiz</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Review My Own Answers Section */}
+                  <div className="results-review-list">
+                    <h3 className="review-title">My Answers Breakdown ({score}/{questions.length})</h3>
+                    {questions.map((q, idx) => {
+                      const userAnswer = selectedAnswers[idx];
+                      const isCorrect = userAnswer === q.correct;
+                      return (
+                        <div key={q.id || idx} className={`review-item ${isCorrect ? 'correct' : 'incorrect'}`}>
+                          <div className="review-item-header">
+                            <span className="review-icon">
+                              {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                            </span>
+                            <span className="review-question-text">Q{idx + 1}: {q.question}</span>
+                          </div>
+                          <div className="review-answer-details">
+                            <div className="answer-row">
+                              <span className="ans-label">Your Answer:</span>
+                              <span className={`ans-val ${isCorrect ? 'good' : 'bad'}`}>
+                                {userAnswer !== undefined ? q.options[userAnswer] : 'Time expired (No answer selected)'}
+                              </span>
+                            </div>
+                            {!isCorrect && (
+                              <div className="answer-row">
+                                <span className="ans-label">Correct Answer:</span>
+                                <span className="ans-val good">{q.options[q.correct]}</span>
+                              </div>
+                            )}
+                            <p className="explanation-text">{q.explanation}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* Attendee Waiting Screen (Leaderboard Hidden by Host) */
+                <div className="attendee-waiting-experience">
+                  <div className="results-header">
+                    <div className="results-trophy-wrap">
+                      <Award size={48} className="results-trophy" />
+                    </div>
+                    <h1 className="results-title">Quiz Completed!</h1>
+                    <p className="results-subtitle">
+                      Great effort, <strong className="user-highlight">{userName}</strong>! Your submission has been recorded.
+                    </p>
+                  </div>
+
+                  {/* Personal Score Summary */}
+                  <div className="score-summary-box">
+                    <div className="score-big-circle">
+                      <span className="score-big-number">{score}</span>
+                      <span className="score-total">/ {questions.length}</span>
+                    </div>
+                    <div className="score-details">
+                      <span className="score-status">
+                        {score / questions.length >= 0.8
+                          ? '🎉 Outstanding Performance!'
+                          : score / questions.length >= 0.5
+                          ? '👍 Great Knowledge!'
+                          : '📚 Good Effort!'}
+                      </span>
+                      <p className="score-percentage">Accuracy: {percentage}% • Speed: {totalTimeSpent}s total</p>
+                    </div>
+                  </div>
+
+                  {/* Waiting Radar Banner */}
+                  <div className="leaderboard-waiting-banner">
+                    <div className="radar-spinner-pulse" />
+                    <div className="waiting-banner-content">
+                      <h3 className="waiting-banner-title">
+                        <Clock size={18} />
+                        Official Leaderboard is Being Finalized
+                      </h3>
+                      <p className="waiting-banner-desc">
+                        The session host (Vignesh) has not revealed the live rankings yet. Stand by! Your rank and the leaderboard podium will automatically appear on this screen the moment the host publishes them.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Review Answers */}
+                  <div className="results-review-list">
+                    <h3 className="review-title">Review Your Answers</h3>
+                    {questions.map((q, idx) => {
+                      const userAnswer = selectedAnswers[idx];
+                      const isCorrect = userAnswer === q.correct;
+                      return (
+                        <div key={q.id || idx} className={`review-item ${isCorrect ? 'correct' : 'incorrect'}`}>
+                          <div className="review-item-header">
+                            <span className="review-icon">
+                              {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                            </span>
+                            <span className="review-question-text">Q{idx + 1}: {q.question}</span>
+                          </div>
+                          <div className="review-answer-details">
+                            <div className="answer-row">
+                              <span className="ans-label">Your Answer:</span>
+                              <span className={`ans-val ${isCorrect ? 'good' : 'bad'}`}>
+                                {userAnswer !== undefined ? q.options[userAnswer] : 'Time expired (No answer selected)'}
+                              </span>
+                            </div>
+                            {!isCorrect && (
+                              <div className="answer-row">
+                                <span className="ans-label">Correct Answer:</span>
+                                <span className="ans-val good">{q.options[q.correct]}</span>
+                              </div>
+                            )}
+                            <p className="explanation-text">{q.explanation}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
               <div className="results-actions">
                 <button
                   type="button"
@@ -1168,6 +1731,75 @@ export default function QuantumQuiz() {
                   <Sparkles size={18} />
                   <span>Return to Home</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* ===============================================================
+              INSPECT PARTICIPANT'S QUIZ MODAL
+             =============================================================== */}
+          {inspectParticipant && (
+            <div className="inspect-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="inspect-modal-title">
+              <div className="inspect-modal-content">
+                <div className="inspect-modal-header">
+                  <div className="inspect-header-info">
+                    <div className="inspect-avatar">
+                      {inspectParticipant.name?.charAt(0).toUpperCase() || 'P'}
+                    </div>
+                    <div>
+                      <h3 id="inspect-modal-title" className="inspect-title">{inspectParticipant.name}&apos;s Quiz Performance</h3>
+                      <p className="inspect-subtitle">
+                        {inspectParticipant.email} • Score: <strong>{inspectParticipant.score}/{questions.length}</strong> ({inspectParticipant.percentage}%) • Speed: {inspectParticipant.timeTaken || 0}s
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-close-btn"
+                    onClick={() => setInspectParticipant(null)}
+                    aria-label="Close Quiz Review"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="inspect-modal-body">
+                  {questions.map((q, idx) => {
+                    const chosen = inspectParticipant.answers ? inspectParticipant.answers[idx] : undefined;
+                    const isCorrect = chosen === q.correct;
+                    return (
+                      <div key={q.id || idx} className={`inspect-q-card ${isCorrect ? 'correct' : 'incorrect'}`}>
+                        <div className="inspect-q-header">
+                          <span className="inspect-q-num">Q{idx + 1}</span>
+                          <span className="inspect-q-text">{q.question}</span>
+                          <span className={`inspect-q-tag ${isCorrect ? 'tag-correct' : 'tag-incorrect'}`}>
+                            {isCorrect ? '✓ Correct (+1)' : '✗ Incorrect (0)'}
+                          </span>
+                        </div>
+                        <div className="inspect-options-list">
+                          {q.options.map((opt, optIdx) => {
+                            const isChosen = chosen === optIdx;
+                            const isRight = optIdx === q.correct;
+                            let optClass = 'inspect-opt-row';
+                            if (isChosen && isRight) optClass += ' chosen-correct';
+                            else if (isChosen && !isRight) optClass += ' chosen-wrong';
+                            else if (isRight) optClass += ' actual-correct';
+
+                            return (
+                              <div key={optIdx} className={optClass}>
+                                <span className="inspect-opt-letter">{String.fromCharCode(65 + optIdx)}</span>
+                                <span className="inspect-opt-text">{opt}</span>
+                                {isChosen && <span className="inspect-badge-selected">Selected</span>}
+                                {isRight && !isChosen && <span className="inspect-badge-correct">Correct Answer</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="inspect-explanation">{q.explanation}</p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
