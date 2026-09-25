@@ -31,7 +31,10 @@ import {
   Medal,
   Timer,
   BarChart3,
-  ChevronRight
+  ChevronRight,
+  Share2,
+  Copy,
+  Check
 } from 'lucide-react';
 import './QuantumQuiz.css';
 
