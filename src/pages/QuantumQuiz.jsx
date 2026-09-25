@@ -37,6 +37,7 @@ import {
   Check
 } from 'lucide-react';
 import './QuantumQuiz.css';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export const ADMIN_EMAIL = "vigneshvelappan73051@gmail.com";
 export const POINTS_PER_CORRECT = 5;
@@ -396,13 +397,46 @@ export default function QuantumQuiz() {
   };
 
   // Cross-device & Cross-tab Real-time Synchronization:
-  // 1. Fetch from server (/api/quiz/...)
-  // 2. BroadcastChannel for sub-millisecond local tab sync
-  // 3. 1-second background poll so phones & remote laptops auto-update
-  // 4. window 'storage' event listener for fallback
+  // 1. Supabase Cloud Database (if configured - works across ANY network/cellular)
+  // 2. Fetch from local server (/api/quiz/...)
+  // 3. BroadcastChannel for sub-millisecond local tab sync
+  // 4. 1-second background poll so phones & remote laptops auto-update
+  // 5. window 'storage' event listener for fallback
   useEffect(() => {
     const fetchLobbyFromServer = async () => {
       try {
+        if (isSupabaseConfigured && supabase) {
+          const { data, error } = await supabase
+            .from('quiz_participants')
+            .select('*')
+            .order('joined_at', { ascending: true });
+          if (!error && Array.isArray(data)) {
+            const currentEmail = (userEmailRef.current || '').trim().toLowerCase();
+            let merged = [...data];
+            if (currentEmail) {
+              const hasSelf = merged.some(p => p.email && p.email.toLowerCase() === currentEmail);
+              if (!hasSelf && stageRef.current === 'WAITING_ROOM') {
+                const selfRecord = {
+                  id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                  name: userNameRef.current || 'Participant',
+                  email: userEmailRef.current,
+                  role: isAdminRef.current ? 'Session Host & Admin' : 'Participant',
+                  status: 'Ready',
+                  avatar: (userNameRef.current || 'P').charAt(0).toUpperCase(),
+                  is_host: isAdminRef.current,
+                };
+                merged.push(selfRecord);
+                supabase.from('quiz_participants').upsert(selfRecord, { onConflict: 'email' }).then(() => {});
+              }
+            }
+            try {
+              localStorage.setItem('HYNA_LOBBY_PARTICIPANTS', JSON.stringify(merged));
+            } catch {}
+            setTeammates(processLobbyList(merged));
+            return;
+          }
+        }
+
         const res = await fetch('/api/quiz/lobby');
         if (res.ok) {
           const serverLobby = await res.json();
@@ -443,6 +477,24 @@ export default function QuantumQuiz() {
 
     const fetchStatusFromServer = async () => {
       try {
+        if (isSupabaseConfigured && supabase) {
+          const { data } = await supabase
+            .from('quiz_session_state')
+            .select('*')
+            .eq('session_id', 'current_session')
+            .maybeSingle();
+          if (data) {
+            if (data.started && stageRef.current === 'WAITING_ROOM') {
+              setStage('QUIZ_ACTIVE');
+              setQuestionTimeLeft(QUESTION_SECONDS);
+            }
+            if (data.show_leaderboard !== undefined) {
+              setShowLeaderboard(Boolean(data.show_leaderboard));
+            }
+            return;
+          }
+        }
+
         const res = await fetch('/api/quiz/status');
         if (res.ok) {
           const status = await res.json();
@@ -459,6 +511,18 @@ export default function QuantumQuiz() {
 
     const fetchLeaderboardFromServer = async () => {
       try {
+        if (isSupabaseConfigured && supabase) {
+          const { data } = await supabase
+            .from('quiz_submissions')
+            .select('*')
+            .order('score', { ascending: false })
+            .order('time_taken', { ascending: true });
+          if (data && Array.isArray(data)) {
+            setLeaderboard(data);
+            return;
+          }
+        }
+
         const res = await fetch('/api/quiz/leaderboard');
         if (res.ok) {
           const lb = await res.json();
@@ -468,6 +532,33 @@ export default function QuantumQuiz() {
         }
       } catch {}
     };
+
+    // Supabase Realtime Channel
+    let sbChannel;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        sbChannel = supabase
+          .channel('quiz_realtime_broadcast')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_participants' }, () => {
+            fetchLobbyFromServer();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_session_state' }, (payload) => {
+            if (payload.new) {
+              if (payload.new.started && stageRef.current === 'WAITING_ROOM') {
+                setStage('QUIZ_ACTIVE');
+                setQuestionTimeLeft(QUESTION_SECONDS);
+              }
+              if (payload.new.show_leaderboard !== undefined) {
+                setShowLeaderboard(Boolean(payload.new.show_leaderboard));
+              }
+            }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_submissions' }, () => {
+            fetchLeaderboardFromServer();
+          })
+          .subscribe();
+      } catch {}
+    }
 
     // BroadcastChannel message listener
     let bc;
@@ -547,6 +638,9 @@ export default function QuantumQuiz() {
       window.removeEventListener('storage', handleStorageChange);
       if (bc) {
         bc.close();
+      }
+      if (sbChannel && supabase) {
+        supabase.removeChannel(sbChannel);
       }
     };
   }, [stage]);
@@ -634,22 +728,42 @@ export default function QuantumQuiz() {
       isHost: adminCheck,
     };
 
-    // 1. Post to backend server first
+    // 1. Post to backend server or Supabase first
     let currentLobby = [];
-    try {
-      const res = await fetch('/api/quiz/lobby', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userObj)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.lobby)) {
-          currentLobby = data.lobby;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('quiz_participants')
+          .upsert({
+            id: userObj.id,
+            name: userObj.name,
+            email: userObj.email,
+            role: userObj.role,
+            status: 'Ready',
+            avatar: userObj.avatar,
+            is_host: userObj.isHost,
+          }, { onConflict: 'email' });
+        const { data } = await supabase.from('quiz_participants').select('*').order('joined_at', { ascending: true });
+        if (data && Array.isArray(data)) {
+          currentLobby = data;
         }
+      } catch {}
+    } else {
+      try {
+        const res = await fetch('/api/quiz/lobby', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userObj)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.lobby)) {
+            currentLobby = data.lobby;
+          }
+        }
+      } catch {
+        // offline fallback
       }
-    } catch {
-      // offline fallback
     }
 
     if (!currentLobby.some(p => p.email && p.email.toLowerCase() === trimmedEmail)) {
@@ -674,6 +788,15 @@ export default function QuantumQuiz() {
     if (adminCheck) {
       try {
         localStorage.setItem('HYNA_QUIZ_STATUS', JSON.stringify({ started: false, showLeaderboard: false }));
+        if (isSupabaseConfigured && supabase) {
+          await supabase.from('quiz_session_state').upsert({
+            session_id: 'current_session',
+            started: false,
+            show_leaderboard: false,
+            active_question: 0,
+            updated_at: new Date().toISOString()
+          });
+        }
         fetch('/api/quiz/status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -688,9 +811,17 @@ export default function QuantumQuiz() {
   };
 
   // Host starts the quiz for everyone
-  const handleHostStartQuiz = () => {
+  const handleHostStartQuiz = async () => {
     try {
       localStorage.setItem('HYNA_QUIZ_STATUS', JSON.stringify({ started: true, startedAt: Date.now() }));
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('quiz_session_state').upsert({
+          session_id: 'current_session',
+          started: true,
+          show_leaderboard: false,
+          updated_at: new Date().toISOString()
+        });
+      }
       fetch('/api/quiz/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -763,10 +894,17 @@ export default function QuantumQuiz() {
     }));
   };
 
-  const handleHostRevealLeaderboard = () => {
+  const handleHostRevealLeaderboard = async () => {
     setShowLeaderboard(true);
     try {
       localStorage.setItem('HYNA_LEADERBOARD_PUBLISHED', 'true');
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('quiz_session_state').upsert({
+          session_id: 'current_session',
+          show_leaderboard: true,
+          updated_at: new Date().toISOString()
+        });
+      }
       fetch('/api/quiz/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -847,7 +985,7 @@ export default function QuantumQuiz() {
     };
   };
 
-  const finalizeQuiz = (finalAnswers = selectedAnswers) => {
+  const finalizeQuiz = async (finalAnswers = selectedAnswers) => {
     // If admin is browsing or ends quiz, admin does NOT get saved as competitor
     if (isAdmin) {
       handleHostRevealLeaderboard();
@@ -882,6 +1020,23 @@ export default function QuantumQuiz() {
 
     try {
       localStorage.setItem('HYNA_QUIZ_LEADERBOARD', JSON.stringify(updatedLb));
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('quiz_submissions').upsert({
+          id: participantRecord.id,
+          name: participantRecord.name,
+          email: participantRecord.email,
+          score: participantRecord.score,
+          max_points: participantRecord.maxPoints,
+          correct_count: participantRecord.correctCount,
+          wrong_count: participantRecord.wrongCount,
+          unattempted_count: participantRecord.unattemptedCount,
+          total_questions: participantRecord.totalQuestions,
+          accuracy: participantRecord.percentage,
+          time_taken: participantRecord.timeTaken,
+          answers: participantRecord.answers,
+          completed_at: new Date().toISOString()
+        });
+      }
       fetch('/api/quiz/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -921,10 +1076,13 @@ export default function QuantumQuiz() {
     broadcastSync(nextVal ? 'LEADERBOARD_REVEAL' : 'LEADERBOARD_HIDE');
   };
 
-  const handleClearLeaderboard = () => {
+  const handleClearLeaderboard = async () => {
     if (window.confirm('Clear all participant results from the leaderboard?')) {
       try {
         localStorage.removeItem('HYNA_QUIZ_LEADERBOARD');
+        if (isSupabaseConfigured && supabase) {
+          await supabase.from('quiz_submissions').delete().neq('id', 'preserve_none');
+        }
         fetch('/api/quiz/leaderboard', { method: 'DELETE' }).catch(() => {});
       } catch {
         // ignore
@@ -944,11 +1102,17 @@ export default function QuantumQuiz() {
     setTeammates([]);
   };
 
-  const handleClearLobby = () => {
+  const handleClearLobby = async () => {
     if (window.confirm('Clear all other participants from the lobby list?')) {
       const selfOnly = teammates.filter(t => t.isCurrentUser);
       try {
         localStorage.setItem('HYNA_LOBBY_PARTICIPANTS', JSON.stringify(selfOnly.map(p => ({ ...p, isCurrentUser: false }))));
+        if (isSupabaseConfigured && supabase) {
+          await supabase
+            .from('quiz_participants')
+            .delete()
+            .neq('email', ADMIN_EMAIL.toLowerCase());
+        }
         fetch('/api/quiz/lobby', { method: 'DELETE' })
           .then(() => {
             if (selfOnly.length > 0) {
