@@ -1747,7 +1747,7 @@ export default function QuantumQuiz() {
                 <div className="teammates-grid">
                   {teammates.map((tm) => (
                     <div
-                      key={tm.id}
+                      key={tm.id || tm.email}
                       className={`teammate-card ${tm.isCurrentUser ? 'current-user-card' : ''} ${tm.isHost ? 'host-card' : ''}`}
                     >
                       <div className="tm-avatar">
