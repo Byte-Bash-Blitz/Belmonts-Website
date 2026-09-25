@@ -36,6 +36,8 @@ import {
 import './QuantumQuiz.css';
 
 export const ADMIN_EMAIL = "vigneshvelappan73051@gmail.com";
+export const POINTS_PER_CORRECT = 5;
+export const POINTS_PER_WRONG = 2;
 
 const DEFAULT_QUIZ_QUESTIONS = [
   {
@@ -613,6 +615,37 @@ export default function QuantumQuiz() {
     }
   };
 
+  // Calculate score details with +5 points for correct, -2 points for wrong
+  const getScoreDetails = (answersObj = selectedAnswers) => {
+    let correctCount = 0;
+    let wrongCount = 0;
+    let unattemptedCount = 0;
+
+    questions.forEach((q, idx) => {
+      const ans = answersObj[idx];
+      if (ans === q.correct) {
+        correctCount++;
+      } else if (ans !== undefined) {
+        wrongCount++;
+      } else {
+        unattemptedCount++;
+      }
+    });
+
+    const totalPoints = (correctCount * POINTS_PER_CORRECT) - (wrongCount * POINTS_PER_WRONG);
+    const maxPoints = questions.length * POINTS_PER_CORRECT;
+    const accuracy = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
+
+    return {
+      points: totalPoints,
+      maxPoints,
+      correctCount,
+      wrongCount,
+      unattemptedCount,
+      accuracy
+    };
+  };
+
   const finalizeQuiz = (finalAnswers = selectedAnswers) => {
     // If admin is browsing or ends quiz, admin does NOT get saved as competitor
     if (isAdmin) {
@@ -620,20 +653,19 @@ export default function QuantumQuiz() {
       return;
     }
 
-    let finalScore = 0;
-    questions.forEach((q, idx) => {
-      if (finalAnswers[idx] === q.correct) {
-        finalScore++;
-      }
-    });
+    const { points, correctCount, wrongCount, unattemptedCount, accuracy, maxPoints } = getScoreDetails(finalAnswers);
 
     const participantRecord = {
       id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: userName || 'Participant',
       email: userEmail || 'anonymous@hyna.studio',
-      score: finalScore,
+      score: points,
+      maxPoints,
+      correctCount,
+      wrongCount,
+      unattemptedCount,
       totalQuestions: questions.length,
-      percentage: Math.round((finalScore / questions.length) * 100),
+      percentage: accuracy,
       timeTaken: totalTimeSpent,
       completedAt: Date.now(),
       answers: finalAnswers,
@@ -708,18 +740,13 @@ export default function QuantumQuiz() {
     }
   };
 
-  const calculateScore = () => {
-    let score = 0;
-    questions.forEach((q, idx) => {
-      if (selectedAnswers[idx] === q.correct) {
-        score++;
-      }
-    });
-    return score;
-  };
-
-  const score = calculateScore();
-  const percentage = Math.round((score / questions.length) * 100);
+  const scoreDetails = getScoreDetails();
+  const score = scoreDetails.points;
+  const maxPossiblePoints = scoreDetails.maxPoints;
+  const correctCount = scoreDetails.correctCount;
+  const wrongCount = scoreDetails.wrongCount;
+  const unattemptedCount = scoreDetails.unattemptedCount;
+  const percentage = scoreDetails.accuracy;
   const answeredCount = Object.keys(selectedAnswers).length;
 
   return (
@@ -1286,7 +1313,7 @@ export default function QuantumQuiz() {
               <div className="waiting-footer">
                 <div className="waiting-footer-info">
                   <ShieldCheck size={18} className="shield-icon" />
-                  <span>{questions.length} Questions • 10 Seconds per Question • Live Leaderboard</span>
+                  <span>{questions.length} Questions • 10s per Question • +5 Correct / -2 Wrong • Live Leaderboard</span>
                 </div>
 
                 {isAdmin && (
@@ -1496,7 +1523,10 @@ export default function QuantumQuiz() {
                         <span className="user-badge-pill">👤 {userName}</span>
                         <span>Question {currentQuestion + 1} of {questions.length}</span>
                       </div>
-                      <span>{answeredCount} / {questions.length} Answered</span>
+                      <div className="progress-right-info">
+                        <span className="scoring-pill-rule">+5 Correct • -2 Wrong</span>
+                        <span>{answeredCount} / {questions.length} Answered</span>
+                      </div>
                     </div>
                     <div className="quiz-progress-track">
                       <div
@@ -1626,7 +1656,7 @@ export default function QuantumQuiz() {
                     </div>
                     <h1 className="results-title">Weekly Bash #37 Leaderboard</h1>
                     <p className="results-subtitle">
-                      Final rankings based on accuracy and completion speed across all {questions.length} Quantum Computing questions.
+                      Final rankings based on points (+5 for correct, -2 for wrong) and completion speed across all {questions.length} Quantum Computing questions.
                     </p>
                   </div>
 
@@ -1668,7 +1698,7 @@ export default function QuantumQuiz() {
                           <div className="podium-avatar">{leaderboard[1].name.charAt(0).toUpperCase()}</div>
                           <h3 className="podium-name">{leaderboard[1].name}</h3>
                           <div className="podium-score-pill">
-                            <span className="score-val">{leaderboard[1].score}/{questions.length}</span>
+                            <span className="score-val">{leaderboard[1].score} pts</span>
                             <span className="time-val">{leaderboard[1].timeTaken || 0}s</span>
                           </div>
                           <button
@@ -1690,7 +1720,7 @@ export default function QuantumQuiz() {
                           <div className="podium-avatar gold-glow">{leaderboard[0].name.charAt(0).toUpperCase()}</div>
                           <h3 className="podium-name">{leaderboard[0].name}</h3>
                           <div className="podium-score-pill gold">
-                            <span className="score-val">{leaderboard[0].score}/{questions.length}</span>
+                            <span className="score-val">{leaderboard[0].score} pts</span>
                             <span className="time-val">{leaderboard[0].timeTaken || 0}s</span>
                           </div>
                           <span className="podium-accuracy">{leaderboard[0].percentage}% Accuracy</span>
@@ -1712,7 +1742,7 @@ export default function QuantumQuiz() {
                           <div className="podium-avatar">{leaderboard[2].name.charAt(0).toUpperCase()}</div>
                           <h3 className="podium-name">{leaderboard[2].name}</h3>
                           <div className="podium-score-pill">
-                            <span className="score-val">{leaderboard[2].score}/{questions.length}</span>
+                            <span className="score-val">{leaderboard[2].score} pts</span>
                             <span className="time-val">{leaderboard[2].timeTaken || 0}s</span>
                           </div>
                           <button
@@ -1776,7 +1806,16 @@ export default function QuantumQuiz() {
                                   </td>
                                   <td className="email-cell">{item.email}</td>
                                   <td className="score-cell">
-                                    <strong>{item.score}</strong> / {item.totalQuestions || questions.length}
+                                    <div className="lb-points-display">
+                                      <strong className="lb-points-num">{item.score}</strong>
+                                      <span className="lb-points-unit">pts</span>
+                                    </div>
+                                    {(item.correctCount !== undefined || item.wrongCount !== undefined) && (
+                                      <div className="lb-score-chips">
+                                        <span className="chip-correct" title="Correct (+5 pts each)">+{item.correctCount ?? 0}</span>
+                                        <span className="chip-wrong" title="Wrong (-2 pts each)">-{item.wrongCount ?? 0}</span>
+                                      </div>
+                                    )}
                                   </td>
                                   <td className="accuracy-cell">
                                     <div className="accuracy-bar-wrap">
@@ -1813,10 +1852,21 @@ export default function QuantumQuiz() {
                   {/* Review Section: Personal for Attendee, Master Key for Host */}
                   {!isAdmin ? (
                     <div className="results-review-list">
-                      <h3 className="review-title">My Answers Breakdown ({score}/{questions.length})</h3>
+                      <div className="results-review-header">
+                        <h3 className="review-title">My Answers Breakdown</h3>
+                        <div className="review-scoring-summary">
+                          <span className="score-pill-pts">Score: <strong>{score} pts</strong></span>
+                          <span className="score-pill-correct">✓ {correctCount} Correct (+{correctCount * POINTS_PER_CORRECT} pts)</span>
+                          <span className="score-pill-wrong">✗ {wrongCount} Wrong (-{wrongCount * POINTS_PER_WRONG} pts)</span>
+                          {unattemptedCount > 0 && (
+                            <span className="score-pill-unanswered">⏱️ {unattemptedCount} Timed Out (0 pts)</span>
+                          )}
+                        </div>
+                      </div>
                       {questions.map((q, idx) => {
                         const userAnswer = selectedAnswers[idx];
                         const isCorrect = userAnswer === q.correct;
+                        const isAnswered = userAnswer !== undefined;
                         return (
                           <div key={q.id || idx} className={`review-item ${isCorrect ? 'correct' : 'incorrect'}`}>
                             <div className="review-item-header">
@@ -1824,6 +1874,9 @@ export default function QuantumQuiz() {
                                 {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                               </span>
                               <span className="review-question-text">Q{idx + 1}: {q.question}</span>
+                              <span className={`points-earned-tag ${isCorrect ? 'tag-plus' : isAnswered ? 'tag-minus' : 'tag-zero'}`}>
+                                {isCorrect ? '+5 pts' : isAnswered ? '-2 pts' : '0 pts'}
+                              </span>
                             </div>
                             <div className="review-answer-details">
                               <div className="answer-row">
@@ -1893,17 +1946,21 @@ export default function QuantumQuiz() {
                   <div className="score-summary-box">
                     <div className="score-big-circle">
                       <span className="score-big-number">{score}</span>
-                      <span className="score-total">/ {questions.length}</span>
+                      <span className="score-total">/ {maxPossiblePoints} pts</span>
                     </div>
                     <div className="score-details">
                       <span className="score-status">
-                        {score / questions.length >= 0.8
+                        {score >= 80
                           ? '🎉 Outstanding Performance!'
-                          : score / questions.length >= 0.5
+                          : score >= 50
                           ? '👍 Great Knowledge!'
-                          : '📚 Good Effort!'}
+                          : score >= 20
+                          ? '📚 Good Effort!'
+                          : '⚡ Keep Practicing!'}
                       </span>
-                      <p className="score-percentage">Accuracy: {percentage}% • Speed: {totalTimeSpent}s total</p>
+                      <p className="score-percentage">
+                        Score: <strong>{score} pts</strong> • {correctCount} Correct (+{correctCount * POINTS_PER_CORRECT} pts) • {wrongCount} Wrong (-{wrongCount * POINTS_PER_WRONG} pts) • {percentage}% Accuracy
+                      </p>
                     </div>
                   </div>
 
@@ -1923,10 +1980,18 @@ export default function QuantumQuiz() {
 
                   {/* Review Answers */}
                   <div className="results-review-list">
-                    <h3 className="review-title">Review Your Answers</h3>
+                    <div className="results-review-header">
+                      <h3 className="review-title">Review Your Answers</h3>
+                      <div className="review-scoring-summary">
+                        <span className="score-pill-pts">Score: <strong>{score} pts</strong></span>
+                        <span className="score-pill-correct">✓ {correctCount} Correct (+{correctCount * POINTS_PER_CORRECT} pts)</span>
+                        <span className="score-pill-wrong">✗ {wrongCount} Wrong (-{wrongCount * POINTS_PER_WRONG} pts)</span>
+                      </div>
+                    </div>
                     {questions.map((q, idx) => {
                       const userAnswer = selectedAnswers[idx];
                       const isCorrect = userAnswer === q.correct;
+                      const isAnswered = userAnswer !== undefined;
                       return (
                         <div key={q.id || idx} className={`review-item ${isCorrect ? 'correct' : 'incorrect'}`}>
                           <div className="review-item-header">
@@ -1934,6 +1999,9 @@ export default function QuantumQuiz() {
                               {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                             </span>
                             <span className="review-question-text">Q{idx + 1}: {q.question}</span>
+                            <span className={`points-earned-tag ${isCorrect ? 'tag-plus' : isAnswered ? 'tag-minus' : 'tag-zero'}`}>
+                              {isCorrect ? '+5 pts' : isAnswered ? '-2 pts' : '0 pts'}
+                            </span>
                           </div>
                           <div className="review-answer-details">
                             <div className="answer-row">
@@ -1993,7 +2061,7 @@ export default function QuantumQuiz() {
                     <div>
                       <h3 id="inspect-modal-title" className="inspect-title">{inspectParticipant.name}&apos;s Quiz Performance</h3>
                       <p className="inspect-subtitle">
-                        {inspectParticipant.email} • Score: <strong>{inspectParticipant.score}/{questions.length}</strong> ({inspectParticipant.percentage}%) • Speed: {inspectParticipant.timeTaken || 0}s
+                        {inspectParticipant.email} • Score: <strong>{inspectParticipant.score} pts</strong> ({inspectParticipant.correctCount ?? 0} Correct • {inspectParticipant.wrongCount ?? 0} Wrong) • Accuracy: {inspectParticipant.percentage}% • Speed: {inspectParticipant.timeTaken || 0}s
                       </p>
                     </div>
                   </div>
@@ -2011,13 +2079,14 @@ export default function QuantumQuiz() {
                   {questions.map((q, idx) => {
                     const chosen = inspectParticipant.answers ? inspectParticipant.answers[idx] : undefined;
                     const isCorrect = chosen === q.correct;
+                    const isAnswered = chosen !== undefined;
                     return (
                       <div key={q.id || idx} className={`inspect-q-card ${isCorrect ? 'correct' : 'incorrect'}`}>
                         <div className="inspect-q-header">
                           <span className="inspect-q-num">Q{idx + 1}</span>
                           <span className="inspect-q-text">{q.question}</span>
-                          <span className={`inspect-q-tag ${isCorrect ? 'tag-correct' : 'tag-incorrect'}`}>
-                            {isCorrect ? '✓ Correct (+1)' : '✗ Incorrect (0)'}
+                          <span className={`inspect-q-tag ${isCorrect ? 'tag-correct' : isAnswered ? 'tag-incorrect' : 'tag-unanswered'}`}>
+                            {isCorrect ? '✓ Correct (+5 pts)' : isAnswered ? '✗ Wrong (-2 pts)' : '⏱️ Timed Out (0 pts)'}
                           </span>
                         </div>
                         <div className="inspect-options-list">
