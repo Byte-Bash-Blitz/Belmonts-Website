@@ -37,7 +37,7 @@ import {
   Check
 } from 'lucide-react';
 import './QuantumQuiz.css';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured, syncConfigFromServer } from '../lib/supabaseClient';
 
 export const ADMIN_EMAIL = "vigneshvelappan73051@gmail.com";
 export const POINTS_PER_CORRECT = 5;
@@ -321,17 +321,37 @@ export default function QuantumQuiz() {
   );
   const [cloudSaved, setCloudSaved] = useState(false);
 
-  const handleSaveSupabaseConfig = (e) => {
+  const handleSaveSupabaseConfig = async (e) => {
     e.preventDefault();
+    const cleanUrl = supabaseUrlInput.trim();
+    const cleanKey = supabaseKeyInput.trim();
     if (typeof window !== 'undefined') {
-      localStorage.setItem('HYNA_SUPABASE_URL', supabaseUrlInput.trim());
-      localStorage.setItem('HYNA_SUPABASE_KEY', supabaseKeyInput.trim());
+      localStorage.setItem('HYNA_SUPABASE_URL', cleanUrl);
+      localStorage.setItem('HYNA_SUPABASE_KEY', cleanKey);
+      try {
+        await fetch('/api/quiz/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ supabaseUrl: cleanUrl, supabaseAnonKey: cleanKey })
+        });
+      } catch {}
       setCloudSaved(true);
       setTimeout(() => {
         window.location.reload();
       }, 700);
     }
   };
+
+  useEffect(() => {
+    syncConfigFromServer().then(configured => {
+      if (configured && typeof window !== 'undefined') {
+        const u = localStorage.getItem('HYNA_SUPABASE_URL') || '';
+        const k = localStorage.getItem('HYNA_SUPABASE_KEY') || '';
+        if (u) setSupabaseUrlInput(u);
+        if (k) setSupabaseKeyInput(k);
+      }
+    });
+  }, []);
 
   // Waiting Room state (seeded with stored lobby)
   const [teammates, setTeammates] = useState(getStoredLobby);
@@ -365,12 +385,14 @@ export default function QuantumQuiz() {
     const currentEmail = (emailOverride ?? userEmailRef.current ?? '').trim().toLowerCase();
     return rawLobby.map(p => {
       const isMe = Boolean(p.email && currentEmail && p.email.toLowerCase() === currentEmail);
+      const isHost = Boolean(p.isHost ?? p.is_host);
       return {
         ...p,
+        isHost,
         isCurrentUser: isMe,
         role: isMe
-          ? (p.isHost ? 'Session Host & Admin (You)' : 'Participant (You)')
-          : (p.isHost ? 'Session Host & Admin' : 'Participant')
+          ? (isHost ? 'Session Host & Admin (You)' : 'Participant (You)')
+          : (isHost ? 'Session Host & Admin' : 'Participant')
       };
     });
   };
