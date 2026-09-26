@@ -1,14 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Primary hardcoded project defaults so client NEVER fails on any device or fresh browser
+export const DEFAULT_SUPABASE_URL = 'https://xzkjltoglnitsgiryjqj.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_VQL1RpHSUCi8R6c0hQxjhA_Ia_hvEh-';
+
 // Get credentials from Vite environment variables or localStorage override
-const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL || '').trim();
+const envKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 const storedUrl = typeof window !== 'undefined' ? (localStorage.getItem('HYNA_SUPABASE_URL') || '').trim() : '';
 const storedKey = typeof window !== 'undefined' ? (localStorage.getItem('HYNA_SUPABASE_KEY') || '').trim() : '';
 
-export let SUPABASE_URL = envUrl || storedUrl;
-export let SUPABASE_ANON_KEY = envKey || storedKey;
+export let SUPABASE_URL = envUrl || storedUrl || DEFAULT_SUPABASE_URL;
+export let SUPABASE_ANON_KEY = envKey || storedKey || DEFAULT_SUPABASE_ANON_KEY;
 
 export let isSupabaseConfigured = Boolean(
   SUPABASE_URL && 
@@ -16,15 +20,13 @@ export let isSupabaseConfigured = Boolean(
   SUPABASE_URL.startsWith('http')
 );
 
-let clientInstance = isSupabaseConfigured
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
-      },
-    })
-  : null;
+let clientInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
+});
 
 export const initSupabase = (url, key) => {
   const cleanUrl = (url || '').trim();

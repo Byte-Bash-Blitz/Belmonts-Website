@@ -643,11 +643,23 @@
   gap: 0.35rem;
   font-size: 0.78rem;
   font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
   color: #4ADE80;
   background: rgba(34, 197, 94, 0.15);
   border: 1px solid rgba(34, 197, 94, 0.3);
-  padding: 0.25rem 0.65rem;
-  border-radius: 9999px;
+}
+
+.ready-indicator-tag.live-online {
+  color: #4ADE80;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.ready-indicator-tag.connecting {
+  color: #FBBF24;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .btn-clear-lobby {
