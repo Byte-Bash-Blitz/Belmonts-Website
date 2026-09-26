@@ -435,6 +435,19 @@
   letter-spacing: 0.1em;
 }
 
+.room-id-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #38BDF8;
+  background: rgba(0, 194, 255, 0.12);
+  border: 1px solid rgba(0, 194, 255, 0.3);
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+}
+
 .waiting-title {
   font-size: 2rem;
   font-weight: 800;

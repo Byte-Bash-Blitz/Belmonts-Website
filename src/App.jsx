@@ -150,7 +150,9 @@ function App() {
         <Route path="/legends" element={<Legends />} />
         <Route path="/treasure" element={<Treasure />} />
         <Route path={QUIZ_URL} element={<QuantumQuiz />} />
+        <Route path="/quiz/:roomId" element={<QuantumQuiz />} />
         <Route path="/quantum-quiz" element={<QuantumQuiz />} />
+        <Route path="/quantum-quiz/:roomId" element={<QuantumQuiz />} />
       </Routes>
     </Router>
   );
